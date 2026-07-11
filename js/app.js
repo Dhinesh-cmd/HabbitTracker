@@ -172,8 +172,12 @@ class HabitTrackerApp {
     }
 
     // Daily Toggles buttons
-    this.dom.toggleGymBtn.addEventListener('click', () => this.toggleSimpleTracker("gym", this.dom.toggleGymBtn));
-    this.dom.toggleFruitBtn.addEventListener('click', () => this.toggleSimpleTracker("fruit", this.dom.toggleFruitBtn));
+    if (this.dom.toggleGymBtn) {
+      this.dom.toggleGymBtn.addEventListener('click', () => this.toggleSimpleTracker("gym", this.dom.toggleGymBtn));
+    }
+    if (this.dom.toggleFruitBtn) {
+      this.dom.toggleFruitBtn.addEventListener('click', () => this.toggleSimpleTracker("fruit", this.dom.toggleFruitBtn));
+    }
 
     // Dismiss Celebration overlay
     this.dom.dismissCelebrationBtn.addEventListener('click', () => {
@@ -263,13 +267,13 @@ class HabitTrackerApp {
     this.dom.sleepHoursText.innerHTML = `${sleep} <span>Hrs</span>`;
 
     // Gym toggle UI
-    if (data.__tracker_gym) {
+    if (data.__tracker_gym && this.dom.toggleGymBtn) {
       this.dom.toggleGymBtn.classList.add('active');
       this.dom.toggleGymBtn.setAttribute('aria-checked', 'true');
     }
 
     // Fruit toggle UI
-    if (data.__tracker_fruit) {
+    if (data.__tracker_fruit && this.dom.toggleFruitBtn) {
       this.dom.toggleFruitBtn.classList.add('active');
       this.dom.toggleFruitBtn.setAttribute('aria-checked', 'true');
     }

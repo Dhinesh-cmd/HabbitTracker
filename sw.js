@@ -3,7 +3,7 @@
  * Handles offline caching and fast load times.
  */
 
-const CACHE_NAME = "habit-tracker-v1";
+const CACHE_NAME = "habit-tracker-v2";
 const ASSETS_TO_CACHE = [
   "./",
   "./index.html",
@@ -51,7 +51,7 @@ self.addEventListener("activate", (e) => {
   self.clients.claim();
 });
 
-// Fetch Event - Cache First, Network Fallback
+// Fetch Event - Network First, Cache Fallback
 self.addEventListener("fetch", (e) => {
   // Avoid caching non-GET queries or extension triggers (like chrome-extension://)
   if (e.request.method !== "GET" || !e.request.url.startsWith(self.location.origin)) {
@@ -59,27 +59,25 @@ self.addEventListener("fetch", (e) => {
   }
 
   e.respondWith(
-    caches.match(e.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        // Return cached version immediately
-        return cachedResponse;
-      }
-
-      // Fallback to fetch from internet network
-      return fetch(e.request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200) {
-          return networkResponse;
+    fetch(e.request)
+      .then((networkResponse) => {
+        // If we got a valid response, cache it and return it
+        if (networkResponse && networkResponse.status === 200) {
+          const responseClone = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(e.request, responseClone);
+          });
         }
-
-        // Cache new fetched resources dynamically
-        return caches.open(CACHE_NAME).then((cache) => {
-          cache.put(e.request, networkResponse.clone());
-          return networkResponse;
+        return networkResponse;
+      })
+      .catch(() => {
+        // If network fails (offline), try to serve from cache
+        return caches.match(e.request).then((cachedResponse) => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          console.warn("[Service Worker] Fetch failed offline. Resource unavailable: ", e.request.url);
         });
-      }).catch(() => {
-        // Offline backup error fallback
-        console.warn("[Service Worker] Fetch failed offline. Resource unavailable: ", e.request.url);
-      });
-    })
+      })
   );
 });
