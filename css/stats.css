@@ -1,0 +1,166 @@
+/* My Daily Habit Tracker - Statistics Custom Styles */
+
+/* Stats Summary Dashboard Grid */
+.stats-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+@media (min-width: 768px) {
+  .stats-metrics-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.metric-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.metric-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.metric-value {
+  font-family: 'Poppins', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--primary);
+  line-height: 1.1;
+}
+
+.metric-value span {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.metric-value.success-val { color: var(--success); }
+.metric-value.warning-val { color: var(--warning); }
+
+.metric-footer {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Charts Grid */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+@media (min-width: 992px) {
+  .charts-grid {
+    grid-template-columns: 3fr 2fr;
+  }
+}
+
+/* Custom Chart Box */
+.chart-container {
+  min-height: 280px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.chart-svg {
+  width: 100%;
+  height: 100%;
+  max-height: 280px;
+}
+
+/* Habits list analytics (Most missed, most consistent) */
+.habit-analytics-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+
+.habit-analytics-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.habit-analytics-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.habit-analytics-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.analytics-percent-badge {
+  font-family: 'Poppins', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--success);
+}
+
+.analytics-percent-badge.danger-badge {
+  color: var(--danger);
+}
+
+/* Extreme stats list (Best day, Worst day) */
+.extremes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.extreme-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+}
+
+.extreme-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.extreme-date {
+  font-family: 'Poppins', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.extreme-day {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.extreme-score {
+  font-family: 'Poppins', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.extreme-score.success-val { color: var(--success); }
+.extreme-score.danger-val { color: var(--danger); }

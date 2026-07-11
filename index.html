@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Daily Habit Tracker</title>
+  
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="A premium minimalist Daily Habit Tracker built to help you maintain consistency, track streaks, and analyze daily routines.">
+  <meta name="theme-color" content="#0F172A">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+  
+  <!-- CSS Stylesheets -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Loading Animation Overlay -->
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- Sticky Navbar -->
+  <nav class="navbar" id="appNavbar">
+    <div class="navbar-container">
+      <a href="index.html" class="nav-brand" id="navLogo">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/>
+          <path d="m9 12 2 2 4-4"/>
+        </svg>
+        My Habit Tracker
+      </a>
+      
+      <div class="nav-info">
+        <span class="nav-date-badge" id="currentDayDate">Wednesday, 08 July 2026</span>
+        <span class="nav-clock" id="navClockDisplay">01:15:32 PM</span>
+      </div>
+
+      <div class="nav-actions">
+        <!-- Navigation Links -->
+        <div class="nav-links">
+          <a href="index.html" class="nav-btn active" id="navTodayBtn" aria-label="Today's Dashboard" title="Dashboard">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          </a>
+          <a href="history.html" class="nav-btn" id="navHistoryBtn" aria-label="History logs" title="History">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </a>
+          <a href="stats.html" class="nav-btn" id="navStatsBtn" aria-label="Statistics charts" title="Statistics">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          </a>
+          <a href="settings.html" class="nav-btn" id="navSettingsBtn" aria-label="Settings configuration" title="Settings">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.5 1z"/></svg>
+          </a>
+        </div>
+        
+        <!-- Theme Toggle -->
+        <button class="nav-btn nav-menu-icon" id="themeToggleBtn" aria-label="Toggle light/dark theme" title="Toggle Theme">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="theme-icon-dark"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- PWA Install Banner -->
+  <div class="container" style="padding-bottom: 0;">
+    <div id="pwaPromoBanner" class="pwa-promo-banner">
+      <div class="pwa-promo-info">
+        <div class="pwa-promo-icon">📲</div>
+        <div class="pwa-promo-text">
+          <h4>Install Habit Tracker App</h4>
+          <p>Add to home screen for offline access and full features.</p>
+        </div>
+      </div>
+      <div class="pwa-promo-actions">
+        <button id="pwaDismissBtn" class="notify-btn dismiss">Not Now</button>
+        <button id="pwaInstallBtn" class="pwa-install-btn">Install</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Container -->
+  <main class="container">
+
+    <!-- Dashboard Header -->
+    <header class="dashboard-header">
+      <div class="header-greeting">
+        <h2 id="dashboardGreeting">Good Morning, Dhinesh 👋</h2>
+        <p id="dashboardHeaderQuote">"Stay consistent. Small habits build big results."</p>
+      </div>
+    </header>
+
+    <!-- Top Summary Card Grid -->
+    <section class="summary-grid">
+      <!-- Today's Progress Summary Card -->
+      <div class="glass-card progress-card" id="todayProgressSummary">
+        <div class="progress-circle-container">
+          <svg class="progress-circle-svg" viewBox="0 0 108 108">
+            <circle class="progress-circle-bg" cx="54" cy="54" r="48" />
+            <circle class="progress-circle-bar" id="todayProgressRing" cx="54" cy="54" r="48" />
+          </svg>
+          <div class="progress-percentage" id="todayProgressPercent">0%</div>
+        </div>
+        <div class="progress-info">
+          <h3 id="progressTitle">Today's Progress</h3>
+          <div class="progress-stat-row">
+            <span>Completed: <strong id="completedCountLabel">0</strong></span>
+            <span>Remaining: <strong id="remainingCountLabel">0</strong></span>
+          </div>
+          <span style="font-size: 0.8rem; color: var(--accent); margin-top: 4px;" id="streakStatusText">Streak: 0 days 🔥</span>
+        </div>
+      </div>
+
+      <!-- Daily Motivation Card -->
+      <div class="glass-card" style="display: flex; flex-direction: column; justify-content: center; gap: 10px;">
+        <h4 style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent);">Daily Inspiration</h4>
+        <blockquote style="font-family: 'Poppins', sans-serif; font-style: italic; font-size: 1.1rem; font-weight: 500; line-height: 1.4;" id="dailyQuoteText">
+          "Consistency beats motivation."
+        </blockquote>
+      </div>
+    </section>
+
+    <!-- Trackers Grid (Mood, Sleep, Water, Attendance, Skincare) -->
+    <section style="margin-bottom: 32px;">
+      <h3 class="section-title">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        Vitals & Trackers
+      </h3>
+      <div class="trackers-grid">
+        <!-- Mood Tracker Card -->
+        <div class="glass-card tracker-card" id="moodTrackerCard">
+          <div class="tracker-header">
+            <span class="tracker-title">Daily Mood</span>
+            <span style="font-size: 1.2rem;">😊</span>
+          </div>
+          <div class="mood-controls">
+            <button class="mood-btn" data-mood="happy" title="Happy" aria-label="Happy 😊">😊</button>
+            <button class="mood-btn" data-mood="neutral" title="Neutral" aria-label="Neutral 😐">😐</button>
+            <button class="mood-btn" data-mood="sad" title="Sad" aria-label="Sad 😔">😔</button>
+          </div>
+        </div>
+
+        <!-- Water Intake Tracker Card -->
+        <div class="glass-card tracker-card" id="waterTrackerCard">
+          <div class="tracker-header">
+            <span class="tracker-title">Water Intake</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a7 7 0 0 0 7-7c0-4.3-7-11-7-11S5 10.7 5 15a7 7 0 0 0 7 7z"/></svg>
+          </div>
+          <div class="water-controls">
+            <button class="circle-btn" id="waterMinusBtn" aria-label="Decrease water intake">-</button>
+            <div class="water-amount" id="waterAmountText">0 <span>Glasses</span></div>
+            <button class="circle-btn" id="waterPlusBtn" aria-label="Increase water intake">+</button>
+          </div>
+        </div>
+
+        <!-- Sleep Tracker Card -->
+        <div class="glass-card tracker-card" id="sleepTrackerCard">
+          <div class="tracker-header">
+            <span class="tracker-title">Sleep Duration</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          </div>
+          <div class="sleep-control">
+            <div class="sleep-input-wrapper">
+              <button class="circle-btn" id="sleepMinusBtn" aria-label="Decrease sleep">-</button>
+              <div class="sleep-hours" id="sleepHoursText">0 <span>Hrs</span></div>
+              <button class="circle-btn" id="sleepPlusBtn" aria-label="Increase sleep">+</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Checklists/Quick Toggles Card -->
+        <div class="glass-card tracker-card" id="togglesTrackerCard">
+          <div class="tracker-header">
+            <span class="tracker-title">Daily Toggles</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div class="toggle-tracker-row" id="toggleGymBtn" role="checkbox" aria-checked="false">
+              <span class="toggle-label">💪 Gym Workout</span>
+              <div class="toggle-switch"></div>
+            </div>
+            <div class="toggle-tracker-row" id="toggleFruitBtn" role="checkbox" aria-checked="false">
+              <span class="toggle-label">🍎 Eat Fruit</span>
+              <div class="toggle-switch"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Daily Schedule Timeline -->
+    <section>
+      <h3 class="section-title">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Today's Schedule
+      </h3>
+      <div id="timelineSchedule" class="timeline-schedule">
+        <!-- Rendered dynamically by js/app.js -->
+      </div>
+      <div class="add-schedule-wrapper">
+        <button id="addScheduleBtn" class="add-schedule-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Schedule
+        </button>
+      </div>
+    </section>
+
+    <!-- Daily Notes Section -->
+    <section class="glass-card notes-card">
+      <h3 style="font-size: 1.1rem; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        Daily Notes
+      </h3>
+      <textarea id="dailyNotesInput" class="notes-textarea" placeholder="Reflect on your routine, log details about meals or workouts..."></textarea>
+    </section>
+
+    <!-- Monthly Heatmap Section (Month-only Heatmap Grid) -->
+    <section class="glass-card heatmap-card">
+      <div class="heatmap-header">
+        <h3 id="heatmapTitle" class="heatmap-month-title">July 2026 Heatmap</h3>
+        <div class="heatmap-legend">
+          <div class="legend-item"><div class="legend-box empty"></div> <span>0%</span></div>
+          <div class="legend-item"><div class="legend-box low"></div> <span>&lt;30%</span></div>
+          <div class="legend-item"><div class="legend-box med"></div> <span>30%-80%</span></div>
+          <div class="legend-item"><div class="legend-box high"></div> <span>&gt;80%</span></div>
+        </div>
+      </div>
+      <div class="heatmap-grid" id="heatmapGridContainer">
+        <!-- Calendar labels and dates rendered dynamically -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Schedule Editor Modal -->
+  <div id="scheduleModal" class="schedule-modal">
+    <div class="schedule-modal-content">
+      <div class="schedule-modal-header">
+        <h3 id="scheduleModalTitle">Edit Schedule Group</h3>
+        <button id="closeScheduleModalBtn" class="modal-close-btn" aria-label="Close dialog">&times;</button>
+      </div>
+      <div class="schedule-modal-body">
+        <div class="input-group">
+          <label for="scheduleTimeInput">Time Slot</label>
+          <input type="text" id="scheduleTimeInput" class="schedule-input" placeholder="e.g. 12:00 PM or Before Lunch">
+        </div>
+        <div class="input-group">
+          <label for="scheduleCategorySelect">Category</label>
+          <select id="scheduleCategorySelect" class="schedule-select">
+            <option value="morning">Morning</option>
+            <option value="afternoon">Afternoon</option>
+            <option value="evening">Evening</option>
+            <option value="night">Night Routine</option>
+            <option value="skincare">Skincare</option>
+          </select>
+        </div>
+        <div class="items-list-container">
+          <label>Habit Items</label>
+          <div id="scheduleItemsList" class="schedule-items-list">
+            <!-- Dynamically populated rows of: input + delete button -->
+          </div>
+          <button type="button" id="addScheduleItemBtn" class="add-item-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Item
+          </button>
+        </div>
+      </div>
+      <div class="schedule-modal-footer">
+        <button id="deleteScheduleBtn" class="modal-btn modal-btn-danger">Delete Group</button>
+        <div class="footer-actions-right">
+          <button id="cancelScheduleBtn" class="modal-btn modal-btn-secondary">Cancel</button>
+          <button id="saveScheduleBtn" class="modal-btn modal-btn-primary">Save Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Celebration Full-Screen Overlay -->
+  <div id="celebrationOverlay" class="celebration-overlay">
+    <div class="celebration-content">
+      <div class="trophy-container">🏆</div>
+      <h2 class="celebration-title">🎉 Congratulations!</h2>
+      <p class="celebration-subtitle">You have completed all of today's habits! Consistency is key, keep up the fantastic work!</p>
+      <button class="celebration-btn" id="dismissCelebrationBtn">Dismiss</button>
+    </div>
+  </div>
+
+  <!-- Notification Container -->
+  <div id="notificationContainer" class="notification-container"></div>
+
+  <!-- Audio elements (handled purely in JS using Web Audio synth) -->
+
+  <!-- JavaScript Entry Point -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

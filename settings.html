@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings - My Daily Habit Tracker</title>
+  
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="Configure alerts, toggle theme styling, clear database logs, and import/export LocalStorage backups.">
+  <meta name="theme-color" content="#0F172A">
+  <link rel="manifest" href="manifest.json">
+  
+  <!-- CSS Stylesheets -->
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/settings.css">
+</head>
+<body>
+
+  <!-- Loading Animation Overlay -->
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- Sticky Navbar -->
+  <nav class="navbar" id="appNavbar">
+    <div class="navbar-container">
+      <a href="index.html" class="nav-brand" id="navLogo">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/>
+          <path d="m9 12 2 2 4-4"/>
+        </svg>
+        My Habit Tracker
+      </a>
+      
+      <div class="nav-info">
+        <span class="nav-date-badge" id="currentDayDate">Wednesday, 08 July 2026</span>
+        <span class="nav-clock" id="navClockDisplay">01:15:32 PM</span>
+      </div>
+
+      <div class="nav-actions">
+        <!-- Navigation Links -->
+        <div class="nav-links">
+          <a href="index.html" class="nav-btn" id="navTodayBtn" aria-label="Today's Dashboard" title="Dashboard">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          </a>
+          <a href="history.html" class="nav-btn" id="navHistoryBtn" aria-label="History logs" title="History">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </a>
+          <a href="stats.html" class="nav-btn" id="navStatsBtn" aria-label="Statistics charts" title="Statistics">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          </a>
+          <a href="settings.html" class="nav-btn active" id="navSettingsBtn" aria-label="Settings configuration" title="Settings">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.5 1z"/></svg>
+          </a>
+        </div>
+        
+        <!-- Theme Toggle -->
+        <button class="nav-btn" id="themeToggleBtn" aria-label="Toggle light/dark theme" title="Toggle Theme">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="theme-icon-dark"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Container -->
+  <main class="container">
+
+    <!-- Header section -->
+    <header class="dashboard-header">
+      <div class="header-greeting">
+        <h2>App Configuration</h2>
+        <p>"Customize your tracker workspace. Manage reminders, audio cues, and import/export operations."</p>
+      </div>
+    </header>
+
+    <!-- Settings Sections -->
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+
+      <!-- User Configuration Card -->
+      <section class="glass-card settings-section-card">
+        <h3 class="settings-section-title">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          User Account Profile
+        </h3>
+        
+        <div class="settings-row">
+          <div class="settings-info">
+            <label class="settings-label" for="userNameInput">Your Name</label>
+            <span class="settings-description">Customizes greetings shown in the primary dashboard.</span>
+          </div>
+          <input type="text" id="userNameInput" class="settings-text-input" value="Dhinesh" placeholder="Enter name...">
+        </div>
+      </section>
+
+      <!-- Preferences Toggles Card -->
+      <section class="glass-card settings-section-card">
+        <h3 class="settings-section-title">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.5 1z"/></svg>
+          Preferences & Audio Toggles
+        </h3>
+
+        <!-- Sound Toggles -->
+        <div class="settings-row">
+          <div class="settings-info">
+            <span class="settings-label">Chime & Alert Sound Effects</span>
+            <span class="settings-description">Plays a synthesis melody upon checklist habit completions and timers.</span>
+          </div>
+          <label class="switch-control" for="soundsToggleInput">
+            <input type="checkbox" id="soundsToggleInput" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <!-- Light Mode Toggle inside settings as row -->
+        <div class="settings-row">
+          <div class="settings-info">
+            <span class="settings-label">Dark default theme</span>
+            <span class="settings-description">Toggles between luxury dark slate and bright premium light styling.</span>
+          </div>
+          <label class="switch-control" for="themeToggleSwitch">
+            <input type="checkbox" id="themeToggleSwitch" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <!-- WhatsApp Toggle -->
+        <div class="settings-row">
+          <div class="settings-info">
+            <span class="settings-label">WhatsApp Notification Reminders</span>
+            <span class="settings-description">Pre-fills a 10-minute warning alert before each scheduled meal.</span>
+          </div>
+          <label class="switch-control" for="whatsappToggleInput">
+            <input type="checkbox" id="whatsappToggleInput">  
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <!-- WhatsApp Phone Config Panel (Expanded dynamically) -->
+        <div class="settings-row" id="whatsappConfigRow" style="display: none; border-top: 1px dashed var(--border-color); padding-top: 16px; margin-top: 8px;">
+          <div class="settings-info">
+            <label class="settings-label" for="whatsappPhoneInput">WhatsApp Phone Number</label>
+            <span class="settings-description">Enter your mobile number with country code (e.g. +919876543210).</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 240px;">
+            <input type="text" id="whatsappPhoneInput" class="settings-text-input" style="max-width: 100%;" placeholder="+919876543210">
+            <button id="testWhatsappBtn" class="settings-btn" style="width: 100%; font-size: 0.8rem; padding: 8px 12px;">📲 Test WhatsApp Connection</button>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- Backups Configuration Card -->
+      <section class="glass-card settings-section-card">
+        <h3 class="settings-section-title">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Data Backup & Reporting
+        </h3>
+
+        <!-- JSON Actions -->
+        <div class="settings-row">
+          <div class="settings-info">
+            <span class="settings-label">JSON Database Backups</span>
+            <span class="settings-description">Download or restore all tracking stats and settings configurations locally.</span>
+          </div>
+          <div class="btn-group-actions">
+            <!-- Hidden input for file picking -->
+            <input type="file" id="importJsonFileInput" accept=".json" style="display: none;">
+            <button id="importJsonBtn" class="settings-btn">📂 Import JSON</button>
+            <button id="exportJsonBtn" class="settings-btn btn-primary">💾 Export JSON</button>
+          </div>
+        </div>
+
+        <!-- Report Download CSV/PDF -->
+        <div class="settings-row">
+          <div class="settings-info">
+            <span class="settings-label">Progress Exports</span>
+            <span class="settings-description">Export data to spreadsheets or print layout reports.</span>
+          </div>
+          <div class="btn-group-actions">
+            <button id="exportCsvBtn" class="settings-btn">📊 Download Monthly Report (CSV)</button>
+            <button id="exportPdfBtn" class="settings-btn">📄 Export PDF Report (Print)</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Hard Resets Card -->
+      <section class="glass-card settings-section-card">
+        <h3 class="settings-section-title" style="color: var(--danger); border-bottom-color: rgba(239, 68, 68, 0.2);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          System Cleanups & Resets
+        </h3>
+
+        <!-- Today Checklist Reset -->
+        <div class="settings-row">
+          <div class="settings-info">
+            <span class="settings-label">Reset Today's Checklist</span>
+            <span class="settings-description">Clears all checkmarks, timestamps and notes for today. Does not affect history logs.</span>
+          </div>
+          <button id="resetTodayBtn" class="settings-btn btn-danger">Reset Today's Data</button>
+        </div>
+
+        <!-- Clear Entire Database -->
+        <div class="settings-row">
+          <div class="settings-info">
+            <span class="settings-label" style="color: var(--danger);">Clear Entire Database History</span>
+            <span class="settings-description" style="color: var(--text-muted);">Permanently wipes all daily stats, streak records, notes and parameters.</span>
+          </div>
+          <button id="clearAllHistoryBtn" class="settings-btn btn-danger" style="background: rgba(239, 68, 68, 0.05);">Wipe Database</button>
+        </div>
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- Confirm Wipe Database Modal -->
+  <div id="wipeDatabaseConfirmModal" class="history-modal-backdrop" role="dialog" aria-modal="true">
+    <div class="history-modal-content" style="max-width: 400px; text-align: center; padding: 32px 24px;">
+      <div style="font-size: 3rem; color: var(--danger); margin-bottom: 16px;">🔥</div>
+      <h2 style="font-size: 1.25rem; margin-bottom: 12px;">Wipe Database History?</h2>
+      <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 24px;">
+        Are you sure you want to permanently clear the **entire database history**? This will reset all logs, streaks, categories, and metrics. This cannot be undone.
+      </p>
+      <div style="display: flex; gap: 12px; justify-content: center;">
+        <button class="notify-btn snooze" id="cancelWipeBtn" style="padding: 10px 20px;">Cancel</button>
+        <button class="notify-btn complete" id="confirmWipeBtn" style="background: var(--danger); padding: 10px 20px;">Clear Everything</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Container -->
+  <div id="notificationContainer" class="notification-container"></div>
+
+  <!-- JS Controller module -->
+  <script type="module" src="js/settings.js"></script>
+</body>
+</html>
