@@ -74,10 +74,7 @@ class SettingsPageController {
     // Hook listeners
     this.setupEventListeners();
 
-    // Hide loader
-    setTimeout(() => {
-      this.dom.loadingOverlay.classList.add('fade-out');
-    }, 300);
+    this.setupPageTransitions();
   }
 
   loadSavedPreferences() {
@@ -85,7 +82,14 @@ class SettingsPageController {
     const settings = rawData.settings || {};
 
     // Name (default "Dhinesh")
-    this.dom.userNameInput.value = settings.userName || "Dhinesh";
+    let userName = "Dhinesh";
+    const user = StorageManager.getUser();
+    if (user && user.name) {
+      userName = user.name;
+    } else if (settings.userName) {
+      userName = settings.userName;
+    }
+    this.dom.userNameInput.value = userName;
 
     // Sounds
     this.dom.soundsToggleInput.checked = settings.sounds !== false;
@@ -117,7 +121,23 @@ class SettingsPageController {
 
     // Username config save on change
     this.dom.userNameInput.addEventListener('input', (e) => {
-      this.saveSettingKey("userName", e.target.value.trim() || "Dhinesh");
+      const val = e.target.value.trim() || "Dhinesh";
+      this.saveSettingKey("userName", val);
+      
+      const user = StorageManager.getUser();
+      if (user) {
+        user.name = val;
+        StorageManager.saveUser(user);
+      } else {
+        StorageManager.saveUser({
+          name: val,
+          age: 25,
+          gender: "Other",
+          weight: "",
+          height: "",
+          createdAt: new Date().toISOString()
+        });
+      }
     });
 
     // Sound toggle config save on change
@@ -176,9 +196,17 @@ class SettingsPageController {
 
     // Reset Today Checklist trigger
     this.dom.resetTodayBtn.addEventListener('click', () => {
+      if (this.dom.loadingOverlay) {
+        this.dom.loadingOverlay.classList.remove('fade-out');
+      }
       StorageManager.resetToday();
       playSuccessChime();
-      this.showLocalToast("Today Reset", "Today's checklist and sliders have been cleared.", "success");
+      setTimeout(() => {
+        this.showLocalToast("Today Reset", "Today's checklist and sliders have been cleared.", "success");
+        if (this.dom.loadingOverlay) {
+          this.dom.loadingOverlay.classList.add('fade-out');
+        }
+      }, 300);
     });
 
 
@@ -192,10 +220,18 @@ class SettingsPageController {
     });
 
     this.dom.confirmWipeBtn.addEventListener('click', () => {
+      if (this.dom.loadingOverlay) {
+        this.dom.loadingOverlay.classList.remove('fade-out');
+      }
       StorageManager.clearEntireHistory();
-      this.showLocalToast("Wiped Clean", "All historical habit logs have been permanently erased.", "warning");
       this.dom.wipeDatabaseConfirmModal.classList.remove('active');
-      this.loadSavedPreferences();
+      setTimeout(() => {
+        this.showLocalToast("Wiped Clean", "All historical habit logs have been permanently erased.", "warning");
+        this.loadSavedPreferences();
+        if (this.dom.loadingOverlay) {
+          this.dom.loadingOverlay.classList.add('fade-out');
+        }
+      }, 400);
     });
 
     // Export JSON
@@ -225,41 +261,73 @@ class SettingsPageController {
       const file = e.target.files[0];
       if (!file) return;
 
+      if (this.dom.loadingOverlay) {
+        this.dom.loadingOverlay.classList.remove('fade-out');
+      }
+
       const reader = new FileReader();
       reader.onload = (event) => {
         const text = event.target.result;
         const success = StorageManager.importData(text);
-        if (success) {
-          playSuccessChime();
-          this.showLocalToast("Restore Complete", "Data imported successfully. Reloading workspace...", "success");
-          setTimeout(() => {
-            window.location.reload();
-          }, 1500);
-        } else {
-          this.showLocalToast("Restore Failed", "Invalid backup file or corrupted format.", "warning");
-        }
+        
+        setTimeout(() => {
+          if (success) {
+            playSuccessChime();
+            this.showLocalToast("Restore Complete", "Data imported successfully. Reloading workspace...", "success");
+            setTimeout(() => {
+              window.location.reload();
+            }, 1000);
+          } else {
+            this.showLocalToast("Restore Failed", "Invalid backup file or corrupted format.", "warning");
+            if (this.dom.loadingOverlay) {
+              this.dom.loadingOverlay.classList.add('fade-out');
+            }
+          }
+        }, 500);
       };
       reader.readAsText(file);
     });
 
-    // Download CSV report
     this.dom.exportCsvBtn.addEventListener('click', () => {
-      const data = StorageManager.getRawData();
-      // Only export day histories
-      const historyOnly = {};
-      Object.keys(data).forEach(k => {
-        if (/^\d{4}-\d{2}-\d{2}$/.test(k)) {
-          historyOnly[k] = data[k];
+      if (this.dom.loadingOverlay) {
+        this.dom.loadingOverlay.classList.remove('fade-out');
+      }
+      setTimeout(() => {
+        const data = StorageManager.getRawData();
+        const historyOnly = {};
+        Object.keys(data).forEach(k => {
+          if (/^\d{4}-\d{2}-\d{2}$/.test(k)) {
+            historyOnly[k] = data[k];
+          }
+        });
+        downloadCSVReport(historyOnly);
+        this.showLocalToast("CSV Generated", "Spreadsheet report download started.", "success");
+        if (this.dom.loadingOverlay) {
+          this.dom.loadingOverlay.classList.add('fade-out');
         }
-      });
-      downloadCSVReport(historyOnly);
-      this.showLocalToast("CSV Generated", "Spreadsheet report download started.", "success");
+      }, 300);
     });
 
     // Export PDF Print View
     this.dom.exportPdfBtn.addEventListener('click', () => {
-      exportPDFReport();
+      if (this.dom.loadingOverlay) {
+        this.dom.loadingOverlay.classList.remove('fade-out');
+      }
+      setTimeout(() => {
+        exportPDFReport();
+        if (this.dom.loadingOverlay) {
+          this.dom.loadingOverlay.classList.add('fade-out');
+        }
+      }, 500);
     });
+
+    // Bottom Nav FAB click
+    const bottomNavAddBtn = document.getElementById('bottomNavAddBtn');
+    if (bottomNavAddBtn) {
+      bottomNavAddBtn.addEventListener('click', () => {
+        window.location.href = 'index.html?openAdd=true';
+      });
+    }
   }
 
   saveSettingKey(key, value) {
@@ -294,6 +362,38 @@ class SettingsPageController {
         }
       }, 300);
     }, 3500);
+  }
+
+  setupPageTransitions() {
+    // Hide loader with a premium fade-out effect
+    setTimeout(() => {
+      if (this.dom.loadingOverlay) {
+        this.dom.loadingOverlay.classList.add('fade-out');
+      }
+    }, 300);
+
+    const navLinks = document.querySelectorAll('.bottom-nav-item, .nav-links a, .nav-brand');
+    navLinks.forEach(link => {
+      link.addEventListener('click', (e) => {
+        const href = link.getAttribute('href');
+        if (!href || href === '#' || href === window.location.pathname.split('/').pop()) return;
+        
+        e.preventDefault();
+        
+        if (link.classList.contains('bottom-nav-item')) {
+          document.querySelectorAll('.bottom-nav-item').forEach(item => item.classList.remove('active'));
+          link.classList.add('active');
+        }
+        
+        if (this.dom.loadingOverlay) {
+          this.dom.loadingOverlay.classList.remove('fade-out');
+        }
+        
+        setTimeout(() => {
+          window.location.href = href;
+        }, 150);
+      });
+    });
   }
 }
 

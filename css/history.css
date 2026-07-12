@@ -53,8 +53,6 @@
 
 .select-dropdown {
   background: var(--card-bg);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
   padding: 10px 16px;
@@ -196,9 +194,7 @@
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(15, 23, 42, 0.8);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(15, 23, 42, 0.85);
   z-index: 2000;
   display: none;
   align-items: center;

@@ -67,20 +67,40 @@ class HabitTrackerApp {
       waterPlusBtn: document.getElementById('waterPlusBtn'),
       sleepMinusBtn: document.getElementById('sleepMinusBtn'),
       sleepPlusBtn: document.getElementById('sleepPlusBtn'),
-      
       // Schedule Modal Elements
       scheduleModal: document.getElementById('scheduleModal'),
       scheduleModalTitle: document.getElementById('scheduleModalTitle'),
       closeScheduleModalBtn: document.getElementById('closeScheduleModalBtn'),
       scheduleTimeInput: document.getElementById('scheduleTimeInput'),
-      scheduleCategorySelect: document.getElementById('scheduleCategorySelect'),
       scheduleItemsList: document.getElementById('scheduleItemsList'),
       addScheduleItemBtn: document.getElementById('addScheduleItemBtn'),
       deleteScheduleBtn: document.getElementById('deleteScheduleBtn'),
       cancelScheduleBtn: document.getElementById('cancelScheduleBtn'),
       saveScheduleBtn: document.getElementById('saveScheduleBtn'),
-      addScheduleBtn: document.getElementById('addScheduleBtn')
+      
+      // Redesigned UI Caches
+      addRoutineHeaderBtn: document.getElementById('addRoutineHeaderBtn'),
+      habitSearchInput: document.getElementById('habitSearchInput'),
+      habitSortBtn: document.getElementById('habitSortBtn'),
+      sortDropdownMenu: document.getElementById('sortDropdownMenu'),
+      currentSortLabel: document.getElementById('currentSortLabel'),
+      statTotalHabits: document.getElementById('statTotalHabits'),
+      statCompletedHabits: document.getElementById('statCompletedHabits'),
+      statPercentHabits: document.getElementById('statPercentHabits'),
+      statActiveCategories: document.getElementById('statActiveCategories'),
+      newHabitItemInput: document.getElementById('newHabitItemInput'),
+      
+      // Onboarding & Custom Edit Elements
+      registrationModal: document.getElementById('registrationModal'),
+      registrationForm: document.getElementById('registrationForm')
     };
+
+    // Redesigned state variables
+    this.activeFilter = 'all'; 
+    this.activeSort = 'time'; 
+    this.searchQuery = '';
+    this.editorCategory = 'diet'; 
+    this.editorHabitList = [];
 
     // Binding methods
     this.init();
@@ -94,6 +114,7 @@ class HabitTrackerApp {
     this.renderHeatmap();
     this.updateDashboardProgress();
     this.startNotificationChecks();
+    this.checkUserRegistration();
 
     // Hide loader with a premium fade-out effect
     setTimeout(() => {
@@ -102,6 +123,17 @@ class HabitTrackerApp {
 
     // Setup PWA install promotion trigger
     this.setupPwaPromo();
+
+    // Check if openAdd query parameter is set to true
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('openAdd') === 'true') {
+      setTimeout(() => {
+        this.openScheduleCreator();
+      }, 500);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    
+    this.setupPageTransitions();
   }
 
   setupLiveClockAndDates() {
@@ -120,17 +152,28 @@ class HabitTrackerApp {
       greeting = "Good Afternoon";
     }
     
-    // Retrieve username from settings (default "Dhinesh")
+    // Retrieve username from habitTrackerUser or fallback
     let userName = "Dhinesh";
-    const rawData = StorageManager.getRawData();
-    if (rawData.settings && rawData.settings.userName) {
-      userName = rawData.settings.userName;
+    const user = StorageManager.getUser();
+    if (user && user.name) {
+      userName = user.name;
+    } else {
+      const rawData = StorageManager.getRawData();
+      if (rawData.settings && rawData.settings.userName) {
+        userName = rawData.settings.userName;
+      }
     }
-    this.dom.dashboardGreeting.textContent = `${greeting}, ${userName} 👋`;
+    this.dom.dashboardGreeting.innerHTML = `${greeting},<br>${userName} 👋`;
 
     // Render Daily Inspiration quote
     const dailyQuote = getDailyQuote(this.todayStr);
     this.dom.dailyQuoteText.textContent = `"${dailyQuote}"`;
+
+    // Also update subtitle if needed
+    const subQuote = document.getElementById('dashboardHeaderQuote');
+    if (subQuote) {
+      subQuote.textContent = "Let's build another consistent day.";
+    }
   }
 
   setupEventListeners() {
@@ -198,8 +241,18 @@ class HabitTrackerApp {
     });
 
     this.dom.addScheduleItemBtn.addEventListener('click', () => {
-      this.addNewHabitInputRow("");
+      this.addEditorHabitFromInput();
     });
+
+    // Support enter key in modal habit text field
+    if (this.dom.newHabitItemInput) {
+      this.dom.newHabitItemInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          this.addEditorHabitFromInput();
+        }
+      });
+    }
 
     this.dom.saveScheduleBtn.addEventListener('click', () => {
       this.saveScheduleChanges();
@@ -209,9 +262,88 @@ class HabitTrackerApp {
       this.deleteScheduleGroup();
     });
 
-    this.dom.addScheduleBtn.addEventListener('click', () => {
-      this.openScheduleCreator();
+    // Header Add Routine button click
+    if (this.dom.addRoutineHeaderBtn) {
+      this.dom.addRoutineHeaderBtn.addEventListener('click', () => {
+        this.openScheduleCreator();
+      });
+    }
+
+    // Search input
+    if (this.dom.habitSearchInput) {
+      this.dom.habitSearchInput.addEventListener('input', (e) => {
+        this.searchQuery = e.target.value.toLowerCase().trim();
+        this.renderChecklist();
+      });
+    }
+
+    // Sort Dropdown Trigger
+    if (this.dom.habitSortBtn) {
+      this.dom.habitSortBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.dom.sortDropdownMenu.classList.toggle('active');
+      });
+    }
+
+    // Hide sort dropdown when clicking outside
+    document.addEventListener('click', () => {
+      if (this.dom.sortDropdownMenu) {
+        this.dom.sortDropdownMenu.classList.remove('active');
+      }
     });
+
+    // Sort Dropdown options selection
+    if (this.dom.sortDropdownMenu) {
+      this.dom.sortDropdownMenu.addEventListener('click', (e) => {
+        const option = e.target.closest('.sort-option');
+        if (!option) return;
+        
+        const sortValue = option.getAttribute('data-sort');
+        this.activeSort = sortValue;
+        
+        // Update label
+        this.dom.currentSortLabel.textContent = option.textContent;
+        
+        // Toggle active option class
+        this.dom.sortDropdownMenu.querySelectorAll('.sort-option').forEach(btn => {
+          btn.classList.toggle('active', btn === option);
+        });
+        
+        this.renderChecklist();
+      });
+    }
+
+    // Filter Chips selection
+    const filterContainer = document.querySelector('.filter-chips-container');
+    if (filterContainer) {
+      filterContainer.addEventListener('click', (e) => {
+        const chip = e.target.closest('.filter-chip');
+        if (!chip) return;
+        
+        this.activeFilter = chip.getAttribute('data-filter');
+        
+        filterContainer.querySelectorAll('.filter-chip').forEach(btn => {
+          btn.classList.toggle('active', btn === chip);
+        });
+        
+        this.renderChecklist();
+      });
+    }
+
+    // Redesigned Modal Category Pills
+    const modalCategorySelector = document.querySelector('.category-pills-selector');
+    if (modalCategorySelector) {
+      modalCategorySelector.addEventListener('click', (e) => {
+        const pill = e.target.closest('.category-pill-btn');
+        if (!pill) return;
+        
+        this.editorCategory = pill.getAttribute('data-category');
+        
+        modalCategorySelector.querySelectorAll('.category-pill-btn').forEach(btn => {
+          btn.classList.toggle('active', btn === pill);
+        });
+      });
+    }
 
     // Handle offline status notification
     window.addEventListener('offline', () => {
@@ -220,6 +352,108 @@ class HabitTrackerApp {
     window.addEventListener('online', () => {
       this.showLocalNotification("Back Online", "Your progress is synced with Local Storage.", "success");
     });
+
+    // Onboarding form submit & validation
+    if (this.dom.registrationForm) {
+      this.dom.registrationForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        const nameInput = document.getElementById('regName');
+        const ageInput = document.getElementById('regAge');
+        const weightInput = document.getElementById('regWeight');
+        const heightInput = document.getElementById('regHeight');
+        const genderInput = this.dom.registrationForm.querySelector('input[name="regGender"]:checked');
+        
+        let isValid = true;
+        
+        // Name validation
+        if (!nameInput.value.trim()) {
+          nameInput.parentElement.classList.add('has-error');
+          isValid = false;
+        } else {
+          nameInput.parentElement.classList.remove('has-error');
+        }
+        
+        // Age validation
+        const ageVal = parseInt(ageInput.value, 10);
+        if (isNaN(ageVal) || ageVal < 5 || ageVal > 120) {
+          ageInput.parentElement.classList.add('has-error');
+          isValid = false;
+        } else {
+          ageInput.parentElement.classList.remove('has-error');
+        }
+        
+        // Gender validation
+        const genderError = document.getElementById('errorGender');
+        if (!genderInput) {
+          genderError.parentElement.classList.add('has-error');
+          isValid = false;
+        } else {
+          genderError.parentElement.classList.remove('has-error');
+        }
+        
+        if (isValid) {
+          const userObj = {
+            name: nameInput.value.trim(),
+            age: ageVal,
+            weight: weightInput.value.trim() ? parseFloat(weightInput.value) : "",
+            height: heightInput.value.trim() ? parseFloat(heightInput.value) : "",
+            gender: genderInput.value,
+            createdAt: new Date().toISOString()
+          };
+          
+          StorageManager.saveUser(userObj);
+          
+          // Hide modal
+          if (this.dom.registrationModal) {
+            this.dom.registrationModal.classList.remove('active');
+          }
+          
+          // Update greeting
+          this.setupLiveClockAndDates();
+          this.showLocalNotification("Welcome!", `Let's build another consistent day, ${userObj.name}! 👋`, "success");
+        }
+      });
+
+      // Clear errors on typing
+      const regName = document.getElementById('regName');
+      if (regName) {
+        regName.addEventListener('input', () => regName.parentElement.classList.remove('has-error'));
+      }
+      const regAge = document.getElementById('regAge');
+      if (regAge) {
+        regAge.addEventListener('input', () => regAge.parentElement.classList.remove('has-error'));
+      }
+      const genderSegments = this.dom.registrationForm.querySelectorAll('input[name="regGender"]');
+      genderSegments.forEach(seg => {
+        seg.addEventListener('change', () => {
+          const genderError = document.getElementById('errorGender');
+          if (genderError) {
+            genderError.parentElement.classList.remove('has-error');
+          }
+        });
+      });
+    }
+
+
+
+    // Double click on Today's Habit section background triggers editor
+    if (this.dom.timelineSchedule) {
+      this.dom.timelineSchedule.addEventListener('dblclick', (e) => {
+        // If click is not inside a specific slot header (which has its own dblclick handler), open editor
+        if (e.target.closest('.time-slot-header') || e.target.closest('.habit-item')) return;
+        this.openHabitEditor();
+      });
+    }
+
+    // Bottom Nav Center FAB Add click
+    const bottomNavAddBtn = document.getElementById('bottomNavAddBtn');
+    if (bottomNavAddBtn) {
+      bottomNavAddBtn.addEventListener('click', () => {
+        this.openScheduleCreator();
+      });
+    }
+  
   }
 
   // Adjust water level
@@ -281,128 +515,366 @@ class HabitTrackerApp {
 
   renderChecklist() {
     this.dom.timelineSchedule.innerHTML = "";
-    
-    // Group habits by time slots
-    const grouped = {};
-    DEFAULT_HABITS.forEach(habit => {
-      if (!grouped[habit.time]) {
-        grouped[habit.time] = [];
-      }
-      grouped[habit.time].push(habit);
-    });
-
     const dayData = StorageManager.getDayData(this.todayStr) || {};
 
-    Object.keys(grouped).forEach(timeSlot => {
-      const habits = grouped[timeSlot];
-      
-      // Determine if all habits in this time slot are checked
-      const allChecked = habits.every(h => dayData[h.id] === true);
+    const totalCount = DEFAULT_HABITS.length;
+    const completedCount = DEFAULT_HABITS.filter(h => dayData[h.id] === true).length;
+    const percent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+    
+    const categoriesSet = new Set(DEFAULT_HABITS.map(h => h.category));
+    const activeCategoriesCount = categoriesSet.size;
 
-      // Create Group Container
-      const groupEl = document.createElement('div');
-      groupEl.className = "time-slot-group";
-      groupEl.innerHTML = `
-        <div class="time-slot-header">
-          <span class="time-slot-title">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            ${timeSlot}
-          </span>
-          <button class="group-toggle-btn ${allChecked ? 'all-checked' : ''}" data-time="${timeSlot}" aria-label="Mark all habits in slot as complete">
-            ${allChecked ? '✓ Checked All' : 'Toggle All'}
+    if (this.dom.statTotalHabits) this.dom.statTotalHabits.textContent = totalCount;
+    if (this.dom.statCompletedHabits) this.dom.statCompletedHabits.textContent = completedCount;
+    if (this.dom.statPercentHabits) this.dom.statPercentHabits.textContent = `${percent}%`;
+    if (this.dom.statActiveCategories) this.dom.statActiveCategories.textContent = activeCategoriesCount;
+
+    // 1. If NO habits exist at all
+    if (totalCount === 0) {
+      this.dom.timelineSchedule.innerHTML = `
+        <div class="empty-state-container onboarding-empty-state">
+          <div class="empty-state-icon">📅</div>
+          <h4>No Schedule Yet</h4>
+          <p>You haven't added any habits for today.</p>
+          <p class="empty-state-subtitle">Add your first routine to start tracking your progress.</p>
+          <button type="button" class="empty-build-btn" id="emptyAddFirstBtn">
+            <i class="fa-solid fa-plus"></i> Add Your First Routine
           </button>
         </div>
-        <div class="habit-list" id="list-${timeSlot.replace(/\s+/g, '-')}"></div>
       `;
+      const emptyBtn = document.getElementById('emptyAddFirstBtn');
+      if (emptyBtn) {
+        emptyBtn.addEventListener('click', () => this.openScheduleCreator());
+      }
+      return;
+    }
 
-      this.dom.timelineSchedule.appendChild(groupEl);
+    // 2. Filter habits for active display
+    let filtered = DEFAULT_HABITS.filter(habit => {
+      // Category filter
+      if (this.activeFilter !== 'all' && habit.category !== this.activeFilter) {
+        return false;
+      }
+      // Search filter
+      if (this.searchQuery) {
+        const nameMatch = habit.name.toLowerCase().includes(this.searchQuery);
+        const categoryMatch = (habit.category || "").toLowerCase().includes(this.searchQuery);
+        const timeMatch = habit.time.toLowerCase().includes(this.searchQuery);
+        if (!nameMatch && !categoryMatch && !timeMatch) return false;
+      }
+      return true;
+    });
+
+    // 3. If habits exist, but search/filter yields zero results
+    if (filtered.length === 0) {
+      this.dom.timelineSchedule.innerHTML = `
+        <div class="empty-state-container search-empty-state">
+          <div class="empty-state-icon">🔍</div>
+          <h4>No Matches Found</h4>
+          <p>We couldn't find any routines matching your query.</p>
+        </div>
+      `;
+      return;
+    }
+
+    // 4. Sort the filtered list
+    filtered.sort((a, b) => {
+      if (this.activeSort === 'time') {
+        return this.timeToMinutes(a.time) - this.timeToMinutes(b.time);
+      }
+      if (this.activeSort === 'category') {
+        const catOrder = { 'diet': 0, 'skincare': 1, 'haircare': 2 };
+        return (catOrder[a.category] ?? 99) - (catOrder[b.category] ?? 99);
+      }
+      if (this.activeSort === 'completed') {
+        const aVal = dayData[a.id] === true ? 0 : 1;
+        const bVal = dayData[b.id] === true ? 0 : 1;
+        return aVal - bVal;
+      }
+      if (this.activeSort === 'pending') {
+        const aVal = dayData[a.id] === true ? 1 : 0;
+        const bVal = dayData[b.id] === true ? 1 : 0;
+        return aVal - bVal;
+      }
+      if (this.activeSort === 'newest') {
+        return DEFAULT_HABITS.indexOf(b) - DEFAULT_HABITS.indexOf(a);
+      }
+      if (this.activeSort === 'oldest') {
+        return DEFAULT_HABITS.indexOf(a) - DEFAULT_HABITS.indexOf(b);
+      }
+      return 0;
+    });
+
+    // Grouping by Category -> Period -> Time Slot
+    const categoryGroups = {
+      'diet': { label: '🥗 Diet', class: 'diet-header', periods: {} },
+      'skincare': { label: '🧴 Skin Care', class: 'skincare-header', periods: {} },
+      'haircare': { label: '💇 Hair Care', class: 'haircare-header', periods: {} }
+    };
+
+    // Ensure any custom category added by user is populated in categoryGroups
+    filtered.forEach(habit => {
+      const cat = habit.category || 'diet';
+      if (!categoryGroups[cat]) {
+        categoryGroups[cat] = { label: cat.toUpperCase(), class: 'diet-header', periods: {} };
+      }
       
-      const headerEl = groupEl.querySelector('.time-slot-header');
-      headerEl.setAttribute('title', 'Double-click to edit this schedule');
-      headerEl.addEventListener('dblclick', (e) => {
-        if (e.target.closest('.group-toggle-btn')) return;
-        this.openScheduleEditor(timeSlot);
-      });
+      const period = this.deriveTimePeriod(habit.time);
+      if (!categoryGroups[cat].periods[period]) {
+        categoryGroups[cat].periods[period] = {};
+      }
+      
+      if (!categoryGroups[cat].periods[period][habit.time]) {
+        categoryGroups[cat].periods[period][habit.time] = [];
+      }
+      
+      categoryGroups[cat].periods[period][habit.time].push(habit);
+    });
 
-      const listContainer = groupEl.querySelector('.habit-list');
+    // Determine which categories to render based on the current filter
+    let categoriesToRender = ['diet', 'skincare', 'haircare'];
+    if (this.activeFilter !== 'all') {
+      categoriesToRender = [this.activeFilter];
+    }
 
-      // Render each habit row
-      habits.forEach(habit => {
-        const completed = dayData[habit.id] === true;
-        const timestamp = dayData.__timestamps?.[habit.id] || "";
+    categoriesToRender.forEach(cat => {
+      const catData = categoryGroups[cat];
+      if (!catData) return;
 
-        const habitRow = document.createElement('div');
-        habitRow.className = `habit-item ${completed ? 'completed' : ''}`;
-        habitRow.setAttribute('data-id', habit.id);
-        habitRow.innerHTML = `
-          <div class="habit-item-left">
-            <div class="custom-checkbox-wrapper">
-              <input type="checkbox" class="habit-checkbox-hidden" ${completed ? 'checked' : ''}>
-              <span class="checkbox-display">
-                <svg viewBox="0 0 24 24">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </span>
-            </div>
-            <span class="habit-text">${habit.name}</span>
-          </div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            ${timestamp ? `<span class="habit-time-stamp">${timestamp}</span>` : ''}
-            <span class="habit-status-badge">${completed ? 'Completed' : 'Todo'}</span>
-          </div>
-        `;
+      // Render Category Container wrapper
+      const catContainer = document.createElement('div');
+      catContainer.className = `category-section-container category-${cat}`;
+      this.dom.timelineSchedule.appendChild(catContainer);
 
-        // Click event on whole item row (makes tapping targets very large)
-        habitRow.addEventListener('click', (e) => {
-          // Avoid double triggers if clicked on inputs directly
-          if (e.target.tagName === 'INPUT') return;
-          
-          const checkbox = habitRow.querySelector('.habit-checkbox-hidden');
-          checkbox.checked = !checkbox.checked;
-          this.handleHabitToggle(habit.id, checkbox.checked, habitRow);
-        });
+      // Render Category Title
+      const catTitleEl = document.createElement('h4');
+      catTitleEl.className = `dashboard-category-title ${catData.class}`;
+      catTitleEl.innerHTML = catData.label;
+      catContainer.appendChild(catTitleEl);
 
-        // Trigger checkbox changes
-        const checkboxInput = habitRow.querySelector('.habit-checkbox-hidden');
-        checkboxInput.addEventListener('change', (e) => {
-          this.handleHabitToggle(habit.id, e.target.checked, habitRow);
-        });
+      const hasHabits = Object.keys(catData.periods).length > 0;
+      if (!hasHabits) {
+        // Show the small placeholder: "No routines scheduled."
+        const emptyCatEl = document.createElement('div');
+        emptyCatEl.className = "category-empty-placeholder";
+        emptyCatEl.innerHTML = `<i class="fa-regular fa-calendar-minus"></i> No routines scheduled.`;
+        catContainer.appendChild(emptyCatEl);
+        return;
+      }
 
-        listContainer.appendChild(habitRow);
-      });
+      // Render periods: Morning, Afternoon, Evening, Night
+      const orderedPeriods = ['Morning', 'Afternoon', 'Evening', 'Night'];
+      
+      // Create a timeline container to hold periods and items
+      const periodListContainer = document.createElement('div');
+      periodListContainer.className = "period-list-container";
+      catContainer.appendChild(periodListContainer);
 
-      // Hook up slot Group toggle click
-      const toggleGroupBtn = groupEl.querySelector('.group-toggle-btn');
-      toggleGroupBtn.addEventListener('click', () => {
-        const currentlyAllChecked = toggleGroupBtn.classList.contains('all-checked');
-        const makeCompleted = !currentlyAllChecked;
+      orderedPeriods.forEach(period => {
+        const timeSlots = catData.periods[period];
+        if (!timeSlots || Object.keys(timeSlots).length === 0) return;
 
-        habits.forEach(habit => {
-          const habitItemRow = listContainer.querySelector(`[data-id="${habit.id}"]`);
-          const cb = habitItemRow.querySelector('.habit-checkbox-hidden');
-          if (cb.checked !== makeCompleted) {
-            cb.checked = makeCompleted;
-            this.handleHabitToggle(habit.id, makeCompleted, habitItemRow, false); // batch mode, play chime once later
-          }
-        });
+        // Render Period Group wrapper
+        const periodGroupEl = document.createElement('div');
+        periodGroupEl.className = "timeline-period-group";
+        periodListContainer.appendChild(periodGroupEl);
 
-        // Play chime on completion batch
-        if (makeCompleted) {
-          playSuccessChime();
-        }
-
-        // Re-evaluate group button label
-        if (makeCompleted) {
-          toggleGroupBtn.classList.add('all-checked');
-          toggleGroupBtn.textContent = '✓ Checked All';
-        } else {
-          toggleGroupBtn.classList.remove('all-checked');
-          toggleGroupBtn.textContent = 'Toggle All';
-        }
+        // Render Period Subtitle Header
+        const periodTitleEl = document.createElement('div');
+        periodTitleEl.className = "dashboard-period-title";
+        let periodEmoji = "🌅";
+        if (period === "Afternoon") periodEmoji = "☀️";
+        else if (period === "Evening") periodEmoji = "🌇";
+        else if (period === "Night") periodEmoji = "🌙";
         
-        this.updateDashboardProgress();
+        periodTitleEl.innerHTML = `<span class="period-emoji">${periodEmoji}</span> <span class="period-name">${period}</span>`;
+        periodGroupEl.appendChild(periodTitleEl);
+
+        // Sort time slots chronologically within period
+        const orderedTimeSlots = Object.keys(timeSlots).sort((a, b) => this.timeToMinutes(a) - this.timeToMinutes(b));
+
+        const cardsContainer = document.createElement('div');
+        cardsContainer.className = "period-cards-container";
+        periodGroupEl.appendChild(cardsContainer);
+
+        orderedTimeSlots.forEach(timeSlot => {
+          const habits = timeSlots[timeSlot];
+          const allChecked = habits.every(h => dayData[h.id] === true);
+
+          // Create group container card
+          const groupEl = document.createElement('div');
+          groupEl.className = `time-slot-group time-slot-group-card`;
+          groupEl.innerHTML = `
+            <div class="time-slot-header">
+              <span class="time-slot-title">
+                <i class="fa-regular fa-clock"></i>
+                ${timeSlot}
+              </span>
+              <div class="time-slot-actions">
+                <button class="slot-edit-btn" data-time="${timeSlot}" data-category="${cat}" title="Edit Group" aria-label="Edit this group of habits">
+                  <i class="fa-solid fa-pencil"></i>
+                </button>
+                <button class="group-toggle-btn ${allChecked ? 'all-checked' : ''}" data-time="${timeSlot}" data-category="${cat}" aria-label="Mark all habits in slot as complete">
+                  ${allChecked ? '✓ Checked All' : 'Toggle All'}
+                </button>
+              </div>
+            </div>
+            <div class="habit-list"></div>
+          `;
+
+          cardsContainer.appendChild(groupEl);
+
+          // Edit click
+          const editBtn = groupEl.querySelector('.slot-edit-btn');
+          if (editBtn) {
+            editBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              this.openScheduleEditor(timeSlot, cat);
+            });
+          }
+
+          // Double click
+          const headerEl = groupEl.querySelector('.time-slot-header');
+          headerEl.setAttribute('title', 'Double-click to edit this schedule');
+          headerEl.addEventListener('dblclick', (e) => {
+            if (e.target.closest('.group-toggle-btn')) return;
+            this.openScheduleEditor(timeSlot, cat);
+          });
+
+          // Render habits
+          const listContainer = groupEl.querySelector('.habit-list');
+          habits.forEach(habit => {
+            const completed = dayData[habit.id] === true;
+            const timestamp = dayData.__timestamps?.[habit.id] || "";
+
+            const habitRow = document.createElement('div');
+            habitRow.className = `habit-item ${completed ? 'completed' : ''}`;
+            habitRow.setAttribute('data-id', habit.id);
+            habitRow.innerHTML = `
+              <div class="habit-item-left">
+                <div class="custom-checkbox-wrapper">
+                  <input type="checkbox" class="habit-checkbox-hidden" ${completed ? 'checked' : ''}>
+                  <span class="checkbox-display">
+                    <svg viewBox="0 0 24 24">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  </span>
+                </div>
+                <span class="habit-text">${habit.name}</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                ${timestamp ? `<span class="habit-time-stamp">${timestamp}</span>` : ''}
+                <span class="habit-status-badge">${completed ? 'Completed' : 'Todo'}</span>
+              </div>
+            `;
+
+            // Tapping anywhere toggles it
+            habitRow.addEventListener('click', (e) => {
+              if (e.target.closest('input')) return;
+              const checkbox = habitRow.querySelector('.habit-checkbox-hidden');
+              checkbox.checked = !checkbox.checked;
+              this.handleHabitToggle(habit.id, checkbox.checked, habitRow);
+            });
+
+            // Tapping checkbox directly toggles it
+            const checkboxInput = habitRow.querySelector('.habit-checkbox-hidden');
+            checkboxInput.addEventListener('change', (e) => {
+              this.handleHabitToggle(habit.id, e.target.checked, habitRow);
+            });
+
+            listContainer.appendChild(habitRow);
+          });
+
+          // Toggle All buttons click
+          const toggleGroupBtn = groupEl.querySelector('.group-toggle-btn');
+          toggleGroupBtn.addEventListener('click', () => {
+            const currentlyAllChecked = toggleGroupBtn.classList.contains('all-checked');
+            const makeCompleted = !currentlyAllChecked;
+
+            habits.forEach(habit => {
+              const habitRowEl = listContainer.querySelector(`[data-id="${habit.id}"]`);
+              const cb = habitRowEl.querySelector('.habit-checkbox-hidden');
+              if (cb.checked !== makeCompleted) {
+                cb.checked = makeCompleted;
+                this.handleHabitToggle(habit.id, makeCompleted, habitRowEl, false);
+              }
+            });
+
+            if (makeCompleted) {
+              playSuccessChime();
+            }
+
+            this.updateDashboardProgress();
+          });
+        });
       });
     });
+  }
+
+  // --- Redesigned Time & Grouping Helpers ---
+  deriveTimePeriod(timeStr) {
+    let hour = 12;
+    if (timeStr.includes('AM') || timeStr.includes('PM')) {
+      const match = timeStr.match(/^(\d{2}|\d):(\d{2})\s*(AM|PM)$/i);
+      if (match) {
+        hour = parseInt(match[1], 10);
+        const ampm = match[3].toUpperCase();
+        if (ampm === "PM" && hour < 12) hour += 12;
+        if (ampm === "AM" && hour === 12) hour = 0;
+      }
+    } else {
+      const [h] = timeStr.split(':');
+      hour = parseInt(h || '12', 10);
+    }
+    
+    if (hour >= 5 && hour < 12) return "Morning";
+    if (hour >= 12 && hour < 17) return "Afternoon";
+    if (hour >= 17 && hour < 21) return "Evening";
+    return "Night";
+  }
+
+  convertTo12Hour(timeStr) {
+    if (!timeStr || !timeStr.includes(':')) return "12:00 PM";
+    const [hourStr, minStr] = timeStr.split(':');
+    let hour = parseInt(hourStr, 10);
+    const min = minStr;
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12;
+    hour = hour ? hour : 12;
+    return `${String(hour).padStart(2, '0')}:${min} ${ampm}`;
+  }
+
+  convertTo24Hour(time12h) {
+    if (!time12h) return "12:00";
+    const match = time12h.match(/^(\d{2}|\d):(\d{2})\s*(AM|PM)$/i);
+    if (!match) return "12:00";
+    let hour = parseInt(match[1], 10);
+    const min = match[2];
+    const ampm = match[3].toUpperCase();
+    if (ampm === "PM" && hour < 12) hour += 12;
+    if (ampm === "AM" && hour === 12) hour = 0;
+    return `${String(hour).padStart(2, '0')}:${min}`;
+  }
+
+  timeToMinutes(timeStr) {
+    if (!timeStr) return 0;
+    let hour = 0;
+    let min = 0;
+    if (timeStr.includes('AM') || timeStr.includes('PM')) {
+      const match = timeStr.match(/^(\d{2}|\d):(\d{2})\s*(AM|PM)$/i);
+      if (match) {
+        hour = parseInt(match[1], 10);
+        min = parseInt(match[2], 10);
+        const ampm = match[3].toUpperCase();
+        if (ampm === "PM" && hour < 12) hour += 12;
+        if (ampm === "AM" && hour === 12) hour = 0;
+      }
+    } else {
+      const parts = timeStr.split(':');
+      hour = parseInt(parts[0] || '0', 10);
+      min = parseInt(parts[1] || '0', 10);
+    }
+    return hour * 60 + min;
   }
 
   handleHabitToggle(habitId, completed, habitRowEl, updateProgressImmediately = true) {
@@ -435,8 +907,26 @@ class HabitTrackerApp {
       timestampWrapper.innerHTML = `<span class="habit-status-badge">Todo</span>`;
     }
 
+    // Update stats bar dynamically
+    const dayData = StorageManager.getDayData(this.todayStr) || {};
+    const totalCount = DEFAULT_HABITS.length;
+    const completedCount = DEFAULT_HABITS.filter(h => dayData[h.id] === true).length;
+    const percent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+    
+    if (this.dom.statCompletedHabits) this.dom.statCompletedHabits.textContent = completedCount;
+    if (this.dom.statPercentHabits) this.dom.statPercentHabits.textContent = `${percent}%`;
+
     // Sync group-level parent button states
-    this.refreshGroupHeaders();
+    const groupEl = habitRowEl.closest('.time-slot-group');
+    if (groupEl) {
+      const itemsList = groupEl.querySelectorAll('.habit-item');
+      const allChecked = Array.from(itemsList).every(row => row.classList.contains('completed'));
+      const btn = groupEl.querySelector('.group-toggle-btn');
+      if (btn) {
+        btn.className = `group-toggle-btn ${allChecked ? 'all-checked' : ''}`;
+        btn.textContent = allChecked ? '✓ Checked All' : 'Toggle All';
+      }
+    }
 
     if (updateProgressImmediately) {
       this.updateDashboardProgress();
@@ -930,118 +1420,139 @@ class HabitTrackerApp {
 
   // --- Schedule Editor Methods ---
 
-  openScheduleEditor(timeSlot) {
+  openScheduleEditor(timeSlot, category = null) {
     this.editingTimeSlot = timeSlot;
-    this.dom.scheduleModalTitle.textContent = `Edit Schedule: ${timeSlot}`;
-    this.dom.deleteScheduleBtn.style.display = "block"; // Show delete button in edit mode
+    this.editingCategory = category || DEFAULT_HABITS.find(h => h.time === timeSlot)?.category || 'diet';
+    this.editorCategory = this.editingCategory;
 
-    // Fetch habits in this time slot
-    const groupHabits = DEFAULT_HABITS.filter(h => h.time === timeSlot);
-    
-    // Set fields
-    this.dom.scheduleTimeInput.value = timeSlot;
-    this.dom.scheduleCategorySelect.value = groupHabits[0]?.category || "morning";
+    this.dom.scheduleModalTitle.innerHTML = `<i class="fa-solid fa-calendar-day"></i> Edit Routine`;
+    this.dom.deleteScheduleBtn.style.display = "block";
 
-    // Populate habit rows
-    this.dom.scheduleItemsList.innerHTML = "";
-    groupHabits.forEach(h => {
-      this.addNewHabitInputRow(h.name, h.id);
-    });
+    // Set time field
+    const time24h = this.convertTo24Hour(timeSlot);
+    this.dom.scheduleTimeInput.value = time24h;
 
-    if (groupHabits.length === 0) {
-      this.addNewHabitInputRow("");
+    // Toggle active category pill
+    const pillsSelector = document.querySelector('.category-pills-selector');
+    if (pillsSelector) {
+      pillsSelector.querySelectorAll('.category-pill-btn').forEach(btn => {
+        const cat = btn.getAttribute('data-category');
+        btn.classList.toggle('active', cat === this.editorCategory);
+      });
     }
 
+    // Fetch habits inside this group (time + category matching)
+    this.editorHabitList = DEFAULT_HABITS.filter(h => h.time === timeSlot && h.category === this.editorCategory).map(h => ({
+      id: h.id,
+      name: h.name
+    }));
+
+    this.renderEditorHabitsList();
+    this.dom.newHabitItemInput.value = "";
     this.dom.scheduleModal.classList.add('active');
   }
 
   openScheduleCreator() {
     this.editingTimeSlot = null;
-    this.dom.scheduleModalTitle.textContent = "Add New Schedule";
-    this.dom.deleteScheduleBtn.style.display = "none"; // Hide delete button in create mode
+    this.editingCategory = null;
+    this.editorCategory = 'diet';
+    this.editorHabitList = [];
 
-    // Reset fields
-    this.dom.scheduleTimeInput.value = "";
-    this.dom.scheduleCategorySelect.value = "morning";
+    this.dom.scheduleModalTitle.innerHTML = `<i class="fa-solid fa-calendar-day"></i> Add New Routine`;
+    this.dom.deleteScheduleBtn.style.display = "none";
+
+    // Defaults
+    this.dom.scheduleTimeInput.value = "07:00";
     
-    // Reset items list with one empty row
-    this.dom.scheduleItemsList.innerHTML = "";
-    this.addNewHabitInputRow("");
+    // Toggle active category pill to diet
+    const pillsSelector = document.querySelector('.category-pills-selector');
+    if (pillsSelector) {
+      pillsSelector.querySelectorAll('.category-pill-btn').forEach(btn => {
+        const cat = btn.getAttribute('data-category');
+        btn.classList.toggle('active', cat === 'diet');
+      });
+    }
 
+    this.renderEditorHabitsList();
+    this.dom.newHabitItemInput.value = "";
     this.dom.scheduleModal.classList.add('active');
-    this.dom.scheduleTimeInput.focus();
+    this.dom.newHabitItemInput.focus();
   }
 
-  addNewHabitInputRow(name = "", habitId = "") {
-    const row = document.createElement('div');
-    row.className = "schedule-item-row";
+  renderEditorHabitsList() {
+    this.dom.scheduleItemsList.innerHTML = "";
     
-    const input = document.createElement('input');
-    input.type = "text";
-    input.className = "schedule-input habit-item-input";
-    input.value = name;
-    input.placeholder = "e.g. Drink Water";
-    if (habitId) {
-      input.setAttribute('data-id', habitId);
+    if (this.editorHabitList.length === 0) {
+      this.dom.scheduleItemsList.innerHTML = `
+        <div style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 12px 0;">
+          No habits added to this slot yet. Add below!
+        </div>
+      `;
+      return;
     }
-    
-    const deleteBtn = document.createElement('button');
-    deleteBtn.type = "button";
-    deleteBtn.className = "delete-item-btn";
-    deleteBtn.title = "Remove Item";
-    deleteBtn.innerHTML = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-    `;
-    deleteBtn.addEventListener('click', () => {
-      row.remove();
+
+    this.editorHabitList.forEach((habit, idx) => {
+      const row = document.createElement('div');
+      row.className = "editor-habit-row";
+      row.innerHTML = `
+        <span class="editor-habit-name">${habit.name}</span>
+        <button type="button" class="delete-habit-btn" title="Delete Habit">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
+      `;
+
+      row.querySelector('.delete-habit-btn').addEventListener('click', () => {
+        this.editorHabitList.splice(idx, 1);
+        this.renderEditorHabitsList();
+      });
+
+      this.dom.scheduleItemsList.appendChild(row);
     });
-    
-    row.appendChild(input);
-    row.appendChild(deleteBtn);
-    this.dom.scheduleItemsList.appendChild(row);
-    
-    if (!name) {
-      input.focus();
+  }
+
+  addEditorHabitFromInput() {
+    const val = this.dom.newHabitItemInput.value.trim();
+    if (!val) {
+      this.showLocalNotification("Validation Error", "Please enter a habit description.", "warning");
+      this.dom.newHabitItemInput.focus();
+      return;
     }
+
+    this.editorHabitList.push({
+      id: null,
+      name: val
+    });
+
+    this.renderEditorHabitsList();
+    this.dom.newHabitItemInput.value = "";
+    this.dom.newHabitItemInput.focus();
   }
 
   saveScheduleChanges() {
-    const newTime = this.dom.scheduleTimeInput.value.trim();
-    if (!newTime) {
-      this.showLocalNotification("Validation Error", "Please enter a time slot name.", "warning");
+    const rawTime = this.dom.scheduleTimeInput.value;
+    if (!rawTime) {
+      this.showLocalNotification("Validation Error", "Please select a time.", "warning");
       this.dom.scheduleTimeInput.focus();
       return;
     }
 
-    const category = this.dom.scheduleCategorySelect.value;
-    
-    // Collect non-empty habit item names
-    const itemInputs = this.dom.scheduleItemsList.querySelectorAll('.habit-item-input');
-    const newItems = [];
-    itemInputs.forEach(input => {
-      const val = input.value.trim();
-      if (val) {
-        newItems.push({
-          id: input.getAttribute('data-id') || null,
-          name: val
-        });
-      }
-    });
+    const newTimeSlot = this.convertTo12Hour(rawTime);
+    const category = this.editorCategory;
 
-    if (newItems.length === 0) {
+    if (this.editorHabitList.length === 0) {
       this.showLocalNotification("Validation Error", "Please add at least one habit item.", "warning");
+      this.dom.newHabitItemInput.focus();
       return;
     }
 
     let updatedHabits;
 
     if (this.editingTimeSlot === null) {
-      // Creator Mode: append new group
-      const habitsToAppend = newItems.map(item => {
-        const id = `${newTime}|${item.name}`;
+      const habitsToAppend = this.editorHabitList.map(item => {
+        const id = `${newTimeSlot}|${item.name}`;
         return {
           id,
-          time: newTime,
+          time: newTimeSlot,
           name: item.name,
           category
         };
@@ -1049,27 +1560,25 @@ class HabitTrackerApp {
       updatedHabits = [...DEFAULT_HABITS, ...habitsToAppend];
       StorageManager.saveHabits(updatedHabits);
     } else {
-      // Editor Mode: replace old group
-      const otherHabits = DEFAULT_HABITS.filter(h => h.time !== this.editingTimeSlot);
-      const currentGroupHabits = DEFAULT_HABITS.filter(h => h.time === this.editingTimeSlot);
+      const otherHabits = DEFAULT_HABITS.filter(h => !(h.time === this.editingTimeSlot && h.category === this.editingCategory));
       
-      const updatedGroupHabits = newItems.map(item => {
-        const id = `${newTime}|${item.name}`;
+      const updatedGroupHabits = this.editorHabitList.map(item => {
+        const id = item.id || `${newTimeSlot}|${item.name}`;
         return {
           id,
-          time: newTime,
+          time: newTimeSlot,
           name: item.name,
           category
         };
       });
 
-      // Data Migration logic for completion state today
       const todayStr = this.todayStr;
       const rawData = StorageManager.getRawData();
       const dayData = rawData[todayStr];
       const migrationMap = {};
       
-      currentGroupHabits.forEach((oldHabit, idx) => {
+      const oldGroupHabits = DEFAULT_HABITS.filter(h => h.time === this.editingTimeSlot && h.category === this.editingCategory);
+      oldGroupHabits.forEach((oldHabit, idx) => {
         const newHabit = updatedGroupHabits[idx];
         if (newHabit && oldHabit.id !== newHabit.id) {
           migrationMap[oldHabit.id] = newHabit.id;
@@ -1095,33 +1604,87 @@ class HabitTrackerApp {
       StorageManager.saveHabits(updatedHabits);
     }
 
-    // Close Modal
-    this.dom.scheduleModal.classList.remove('active');
-    
-    // UI Feedback
-    playSuccessChime();
-    this.showLocalNotification("Schedule Saved", "Your habits schedule has been updated.", "success");
-    
-    // Refresh Today
-    this.renderChecklist();
-    this.updateDashboardProgress();
+    if (this.dom.loadingOverlay) {
+      this.dom.loadingOverlay.classList.remove('fade-out');
+    }
+
+    setTimeout(() => {
+      this.dom.scheduleModal.classList.remove('active');
+      playSuccessChime();
+      this.showLocalNotification("Schedule Saved", "Your routine schedule has been updated.", "success");
+      this.renderChecklist();
+      this.updateDashboardProgress();
+      if (this.dom.loadingOverlay) {
+        this.dom.loadingOverlay.classList.add('fade-out');
+      }
+    }, 300);
   }
 
   deleteScheduleGroup() {
     if (!this.editingTimeSlot) return;
 
-    if (!confirm(`Are you sure you want to delete the schedule group for "${this.editingTimeSlot}"? All habits in this group will be removed.`)) {
+    if (!confirm(`Are you sure you want to delete this routine group?`)) {
       return;
     }
 
-    const updatedHabits = DEFAULT_HABITS.filter(h => h.time !== this.editingTimeSlot);
+    if (this.dom.loadingOverlay) {
+      this.dom.loadingOverlay.classList.remove('fade-out');
+    }
+
+    const updatedHabits = DEFAULT_HABITS.filter(h => !(h.time === this.editingTimeSlot && h.category === this.editingCategory));
     StorageManager.saveHabits(updatedHabits);
 
-    this.dom.scheduleModal.classList.remove('active');
-    this.showLocalNotification("Deleted Group", `Removed all habits for "${this.editingTimeSlot}".`, "warning");
-    
-    this.renderChecklist();
-    this.updateDashboardProgress();
+    setTimeout(() => {
+      this.dom.scheduleModal.classList.remove('active');
+      this.showLocalNotification("Deleted Routine", "Removed all habits in this routine group.", "warning");
+      this.renderChecklist();
+      this.updateDashboardProgress();
+      if (this.dom.loadingOverlay) {
+        this.dom.loadingOverlay.classList.add('fade-out');
+      }
+    }, 300);
+  }
+
+  checkUserRegistration() {
+    const user = StorageManager.getUser();
+    if (!user) {
+      if (this.dom.registrationModal) {
+        this.dom.registrationModal.classList.add('active');
+      }
+    }
+  }
+
+  openHabitEditor() {
+    if (DEFAULT_HABITS.length > 0) {
+      this.openScheduleEditor(DEFAULT_HABITS[0].time, DEFAULT_HABITS[0].category);
+    } else {
+      this.openScheduleCreator();
+    }
+  }
+
+  setupPageTransitions() {
+    const navLinks = document.querySelectorAll('.bottom-nav-item, .nav-links a, .nav-brand');
+    navLinks.forEach(link => {
+      link.addEventListener('click', (e) => {
+        const href = link.getAttribute('href');
+        if (!href || href === '#' || href === window.location.pathname.split('/').pop()) return;
+        
+        e.preventDefault();
+        
+        if (link.classList.contains('bottom-nav-item')) {
+          document.querySelectorAll('.bottom-nav-item').forEach(item => item.classList.remove('active'));
+          link.classList.add('active');
+        }
+        
+        if (this.dom.loadingOverlay) {
+          this.dom.loadingOverlay.classList.remove('fade-out');
+        }
+        
+        setTimeout(() => {
+          window.location.href = href;
+        }, 150);
+      });
+    });
   }
 }
 

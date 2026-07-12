@@ -67,14 +67,19 @@ class StatsPageController {
       this.renderCharts();
     });
 
+    // Bottom Nav FAB click
+    const bottomNavAddBtn = document.getElementById('bottomNavAddBtn');
+    if (bottomNavAddBtn) {
+      bottomNavAddBtn.addEventListener('click', () => {
+        window.location.href = 'index.html?openAdd=true';
+      });
+    }
+
     // Load data and draw views
     this.calculateMetrics();
     this.renderCharts();
 
-    // Hide loader
-    setTimeout(() => {
-      this.dom.loadingOverlay.classList.add('fade-out');
-    }, 300);
+    this.setupPageTransitions();
   }
 
   calculateMetrics() {
@@ -451,6 +456,38 @@ class StatsPageController {
     });
 
     this.dom.categoryChartContainer.appendChild(svg);
+  }
+
+  setupPageTransitions() {
+    // Hide loader with a premium fade-out effect
+    setTimeout(() => {
+      if (this.dom.loadingOverlay) {
+        this.dom.loadingOverlay.classList.add('fade-out');
+      }
+    }, 300);
+
+    const navLinks = document.querySelectorAll('.bottom-nav-item, .nav-links a, .nav-brand');
+    navLinks.forEach(link => {
+      link.addEventListener('click', (e) => {
+        const href = link.getAttribute('href');
+        if (!href || href === '#' || href === window.location.pathname.split('/').pop()) return;
+        
+        e.preventDefault();
+        
+        if (link.classList.contains('bottom-nav-item')) {
+          document.querySelectorAll('.bottom-nav-item').forEach(item => item.classList.remove('active'));
+          link.classList.add('active');
+        }
+        
+        if (this.dom.loadingOverlay) {
+          this.dom.loadingOverlay.classList.remove('fade-out');
+        }
+        
+        setTimeout(() => {
+          window.location.href = href;
+        }, 150);
+      });
+    });
   }
 }
 

@@ -3,56 +3,17 @@
  * Handles data persistence, auto-initialization, streaks, and data cleanup.
  */
 
-const DEFAULT_HABITS_INITIAL = [
-  { id: "06:45 AM|Drink Fenugreek Water", time: "6:45 AM", name: "Drink Fenugreek Water", category: "morning" },
-  { id: "06:45 AM|Drink Jeera Water", time: "6:45 AM", name: "Drink Jeera Water", category: "morning" },
-  
-  { id: "07:00 AM|Eat 2 Bananas", time: "7:00 AM", name: "Eat 2 Bananas", category: "morning" },
-  { id: "07:00 AM|Eat 5 Almonds", time: "7:00 AM", name: "Eat 5 Almonds", category: "morning" },
-  { id: "07:00 AM|Eat 25g Peanuts", time: "7:00 AM", name: "Eat 25g Peanuts", category: "morning" },
-  
-  { id: "07:15 AM - 08:45 AM|Gym Workout", time: "7:15 AM – 8:45 AM", name: "Gym Workout", category: "morning" },
-  
-  { id: "08:50 AM|Drink ABC Juice (250ml)", time: "8:50 AM", name: "Drink ABC Juice (250ml)", category: "morning" },
-  { id: "08:50 AM|Eat 2 Eggs", time: "8:50 AM", name: "Eat 2 Eggs", category: "morning" },
-  
-  { id: "10:00 AM|Eat 5 Idly", time: "10:00 AM", name: "Eat 5 Idly", category: "morning" },
-  { id: "10:00 AM|Eat Sambar", time: "10:00 AM", name: "Eat Sambar", category: "morning" },
-  { id: "10:00 AM|Eat 2 Eggs", time: "10:00 AM", name: "Eat 2 Eggs", category: "morning" },
-  { id: "10:00 AM|Drink Lemon Juice", time: "10:00 AM", name: "Drink Lemon Juice", category: "morning" },
-  
-  { id: "11:30 AM|Eat Sundal Salad (200g)", time: "11:30 AM", name: "Eat Sundal Salad (200g)", category: "afternoon" },
-  { id: "11:30 AM|Eat Soya Chunks (50g)", time: "11:30 AM", name: "Eat Soya Chunks (50g)", category: "afternoon" },
-  
-  { id: "01:00 PM|Rice (250g)", time: "1:00 PM", name: "Rice (250g)", category: "afternoon" },
-  { id: "01:00 PM|Vegetables", time: "1:00 PM", name: "Vegetables", category: "afternoon" },
-  { id: "01:00 PM|Sambar", time: "1:00 PM", name: "Sambar", category: "afternoon" },
-  { id: "01:00 PM|Chicken (125g)", time: "1:00 PM", name: "Chicken (125g)", category: "afternoon" },
-  
-  { id: "04:00 PM|Sabja Water", time: "4:00 PM", name: "Sabja Water", category: "afternoon" },
-  { id: "04:00 PM|Dates (50g)", time: "4:00 PM", name: "Dates (50g)", category: "afternoon" },
-  { id: "04:00 PM|Almonds", time: "4:00 PM", name: "Almonds", category: "afternoon" },
-  { id: "04:00 PM|Peanuts", time: "4:00 PM", name: "Peanuts", category: "afternoon" },
-  
-  { id: "05:00 PM|Eat 1 Fruit", time: "5:00 PM", name: "Eat 1 Fruit", category: "afternoon" },
-  
-  { id: "Morning Face Care|Ice Cube Face Massage", time: "Morning Face Care", name: "Ice Cube Face Massage", category: "skincare" },
-  
-  { id: "07:00 PM|Tiffin", time: "7:00 PM", name: "Tiffin", category: "evening" },
-  { id: "07:00 PM|Chicken (125g)", time: "7:00 PM", name: "Chicken (125g)", category: "evening" },
-  
-  { id: "09:00 PM|Drink Milk (250ml)", time: "9:00 PM", name: "Drink Milk (250ml)", category: "evening" },
-  
-  { id: "Before Sleep|Ice Cube Face Massage", time: "Before Sleep", name: "Ice Cube Face Massage", category: "skincare" },
-  
-  { id: "09:30 PM|Sleep Before 10 PM", time: "9:30 PM", name: "Sleep Before 10 PM", category: "night" }
-];
+const DEFAULT_HABITS_INITIAL = [];
 
 export const DEFAULT_HABITS = [...DEFAULT_HABITS_INITIAL];
 
 // Load custom habits if present in localStorage
 try {
-  const customHabitsJson = localStorage.getItem("HabitsList");
+  let customHabitsJson = localStorage.getItem("dailyHabits");
+  if (!customHabitsJson) {
+    // Migration fallback
+    customHabitsJson = localStorage.getItem("HabitsList");
+  }
   if (customHabitsJson) {
     const parsed = JSON.parse(customHabitsJson);
     if (Array.isArray(parsed) && parsed.length > 0) {
@@ -374,7 +335,7 @@ export class StorageManager {
    */
   static saveHabits(newHabits) {
     try {
-      localStorage.setItem("HabitsList", JSON.stringify(newHabits));
+      localStorage.setItem("dailyHabits", JSON.stringify(newHabits));
       DEFAULT_HABITS.length = 0;
       DEFAULT_HABITS.push(...newHabits);
       
@@ -385,6 +346,30 @@ export class StorageManager {
     } catch (e) {
       console.error("Failed to save custom habits", e);
       return false;
+    }
+  }
+
+  /**
+   * Get user registration details.
+   */
+  static getUser() {
+    try {
+      const user = localStorage.getItem("habitTrackerUser");
+      return user ? JSON.parse(user) : null;
+    } catch (e) {
+      console.error("Failed to get user registration details", e);
+      return null;
+    }
+  }
+
+  /**
+   * Save user registration details.
+   */
+  static saveUser(user) {
+    try {
+      localStorage.setItem("habitTrackerUser", JSON.stringify(user));
+    } catch (e) {
+      console.error("Failed to save user registration details", e);
     }
   }
 }
