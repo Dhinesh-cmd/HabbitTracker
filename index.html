@@ -144,19 +144,34 @@
           <i class="fa-solid fa-magnifying-glass search-icon"></i>
           <input type="text" id="habitSearchInput" class="schedule-search-input" placeholder="Search habits, time, category...">
         </div>
-        <div class="sort-wrapper">
-          <button id="habitSortBtn" class="sort-dropdown-trigger" title="Sort Schedule">
-            <i class="fa-solid fa-arrow-down-wide-short"></i> Sort: <span id="currentSortLabel">Time</span>
-          </button>
-          <div id="sortDropdownMenu" class="sort-dropdown-menu">
-            <button class="sort-option active" data-sort="time">Time</button>
-            <button class="sort-option" data-sort="category">Category</button>
-            <button class="sort-option" data-sort="completed">Completed</button>
-            <button class="sort-option" data-sort="pending">Pending</button>
-            <button class="sort-option" data-sort="newest">Newest First</button>
-            <button class="sort-option" data-sort="oldest">Oldest First</button>
+        
+          <div class="sort-wrapper">
+            <button id="habitSortBtn" class="sort-dropdown-trigger" title="Sort Schedule">
+              <i class="fa-solid fa-arrow-down-wide-short"></i> Sort: <span id="currentSortLabel">Time</span>
+            </button>
+            <div id="sortDropdownMenu" class="sort-dropdown-menu">
+              <button class="sort-option active" data-sort="time">Time</button>
+              <button class="sort-option" data-sort="category">Category</button>
+              <button class="sort-option" data-sort="completed">Completed</button>
+              <button class="sort-option" data-sort="pending">Pending</button>
+              <button class="sort-option" data-sort="newest">Newest First</button>
+              <button class="sort-option" data-sort="oldest">Oldest First</button>
+            </div>
           </div>
-        </div>
+          
+          <div class="category-filter-wrapper">
+            <button id="habitCategoryBtn" class="sort-dropdown-trigger" title="Filter Category">
+              <i class="fa-solid fa-filter"></i> Category: <span id="currentCategoryLabel">All</span>
+            </button>
+            <div id="categoryDropdownMenu" class="sort-dropdown-menu">
+              <button class="category-option active" data-filter="all">All</button>
+              <button class="category-option" data-filter="diet">🥗 Diet</button>
+              <button class="category-option" data-filter="skincare">🧴 Skin Care</button>
+              <button class="category-option" data-filter="haircare">💇 Hair Care</button>
+              <button class="category-option" data-filter="routine">📅 Routine</button>
+              <button class="category-option" data-filter="others">📦 Others</button>
+            </div>
+          </div>
       </div>
 
       <!-- Filter Chips -->
@@ -165,6 +180,8 @@
         <button class="filter-chip" data-filter="diet">🥗 Diet</button>
         <button class="filter-chip" data-filter="skincare">🧴 Skin Care</button>
         <button class="filter-chip" data-filter="haircare">💇 Hair Care</button>
+        <button class="filter-chip" data-filter="routine">📅 Routine</button>
+        <button class="filter-chip" data-filter="others">📦 Others</button>
       </div>
 
       <!-- Timeline schedule list -->
@@ -236,7 +253,7 @@
     <!-- Monthly Heatmap Section (Month-only Heatmap Grid) -->
     <section class="glass-card heatmap-card">
       <div class="heatmap-header">
-        <h3 id="heatmapTitle" class="heatmap-month-title">July 2026 Heatmap</h3>
+        <h3 id="heatmapTitle" class="heatmap-month-title">July 2026</h3>
         <div class="heatmap-legend">
           <div class="legend-item"><div class="legend-box empty"></div> <span>0%</span></div>
           <div class="legend-item"><div class="legend-box low"></div> <span>&lt;30%</span></div>
@@ -273,6 +290,12 @@
             </button>
             <button type="button" class="category-pill-btn" data-category="haircare">
               <span>💇</span> Hair Care
+            </button>
+            <button type="button" class="category-pill-btn" data-category="routine">
+              <span>📅</span> Routine
+            </button>
+            <button type="button" class="category-pill-btn" data-category="others">
+              <span>📦</span> Others
             </button>
           </div>
         </div>

@@ -3,7 +3,7 @@
  * Coordinates UI rendering, event listeners, trackers, notifications, and heatmap.
  */
 
-import { DEFAULT_HABITS, StorageManager } from './storage.js';
+import { DEFAULT_HABITS, StorageManager, CATEGORIES } from './storage.js';
 import { 
   getDailyQuote, 
   formatHeaderDate, 
@@ -13,7 +13,8 @@ import {
   playNotificationSound,
   initTheme, 
   toggleTheme,
-  registerServiceWorker
+  registerServiceWorker,
+  showToast
 } from './utils.js';
 
 class HabitTrackerApp {
@@ -84,6 +85,9 @@ class HabitTrackerApp {
       habitSortBtn: document.getElementById('habitSortBtn'),
       sortDropdownMenu: document.getElementById('sortDropdownMenu'),
       currentSortLabel: document.getElementById('currentSortLabel'),
+      habitCategoryBtn: document.getElementById('habitCategoryBtn'),
+      categoryDropdownMenu: document.getElementById('categoryDropdownMenu'),
+      currentCategoryLabel: document.getElementById('currentCategoryLabel'),
       statTotalHabits: document.getElementById('statTotalHabits'),
       statCompletedHabits: document.getElementById('statCompletedHabits'),
       statPercentHabits: document.getElementById('statPercentHabits'),
@@ -114,12 +118,13 @@ class HabitTrackerApp {
     this.renderHeatmap();
     this.updateDashboardProgress();
     this.startNotificationChecks();
+    this.requestNotificationPermission();
     this.checkUserRegistration();
 
     // Hide loader with a premium fade-out effect
     setTimeout(() => {
       this.dom.loadingOverlay.classList.add('fade-out');
-    }, 400);
+    }, 50);
 
     // Setup PWA install promotion trigger
     this.setupPwaPromo();
@@ -282,13 +287,26 @@ class HabitTrackerApp {
       this.dom.habitSortBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         this.dom.sortDropdownMenu.classList.toggle('active');
+        if (this.dom.categoryDropdownMenu) this.dom.categoryDropdownMenu.classList.remove('active');
       });
     }
 
-    // Hide sort dropdown when clicking outside
+    // Category Dropdown Trigger
+    if (this.dom.habitCategoryBtn) {
+      this.dom.habitCategoryBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.dom.categoryDropdownMenu.classList.toggle('active');
+        if (this.dom.sortDropdownMenu) this.dom.sortDropdownMenu.classList.remove('active');
+      });
+    }
+
+    // Hide dropdowns when clicking outside
     document.addEventListener('click', () => {
       if (this.dom.sortDropdownMenu) {
         this.dom.sortDropdownMenu.classList.remove('active');
+      }
+      if (this.dom.categoryDropdownMenu) {
+        this.dom.categoryDropdownMenu.classList.remove('active');
       }
     });
 
@@ -313,6 +331,35 @@ class HabitTrackerApp {
       });
     }
 
+    // Category Dropdown options selection
+    if (this.dom.categoryDropdownMenu) {
+      this.dom.categoryDropdownMenu.addEventListener('click', (e) => {
+        const option = e.target.closest('.category-option');
+        if (!option) return;
+        
+        const filterValue = option.getAttribute('data-filter');
+        this.activeFilter = filterValue;
+        
+        // Update label
+        this.dom.currentCategoryLabel.innerHTML = option.innerHTML;
+        
+        // Toggle active option class
+        this.dom.categoryDropdownMenu.querySelectorAll('.category-option').forEach(btn => {
+          btn.classList.toggle('active', btn === option);
+        });
+
+        // Sync with filter chips (desktop)
+        const filterContainer = document.querySelector('.filter-chips-container');
+        if (filterContainer) {
+          filterContainer.querySelectorAll('.filter-chip').forEach(btn => {
+            btn.classList.toggle('active', btn.getAttribute('data-filter') === filterValue);
+          });
+        }
+        
+        this.renderChecklist();
+      });
+    }
+
     // Filter Chips selection
     const filterContainer = document.querySelector('.filter-chips-container');
     if (filterContainer) {
@@ -320,11 +367,23 @@ class HabitTrackerApp {
         const chip = e.target.closest('.filter-chip');
         if (!chip) return;
         
-        this.activeFilter = chip.getAttribute('data-filter');
+        const filterValue = chip.getAttribute('data-filter');
+        this.activeFilter = filterValue;
         
         filterContainer.querySelectorAll('.filter-chip').forEach(btn => {
           btn.classList.toggle('active', btn === chip);
         });
+
+        // Sync with Category Dropdown
+        if (this.dom.categoryDropdownMenu) {
+          this.dom.categoryDropdownMenu.querySelectorAll('.category-option').forEach(btn => {
+            const isMatch = btn.getAttribute('data-filter') === filterValue;
+            btn.classList.toggle('active', isMatch);
+            if (isMatch) {
+              this.dom.currentCategoryLabel.innerHTML = btn.innerHTML;
+            }
+          });
+        }
         
         this.renderChecklist();
       });
@@ -583,7 +642,10 @@ class HabitTrackerApp {
         return this.timeToMinutes(a.time) - this.timeToMinutes(b.time);
       }
       if (this.activeSort === 'category') {
-        const catOrder = { 'diet': 0, 'skincare': 1, 'haircare': 2 };
+        const catOrder = {};
+        CATEGORIES.forEach((c, idx) => {
+          catOrder[c.id] = idx;
+        });
         return (catOrder[a.category] ?? 99) - (catOrder[b.category] ?? 99);
       }
       if (this.activeSort === 'completed') {
@@ -606,17 +668,21 @@ class HabitTrackerApp {
     });
 
     // Grouping by Category -> Period -> Time Slot
-    const categoryGroups = {
-      'diet': { label: '🥗 Diet', class: 'diet-header', periods: {} },
-      'skincare': { label: '🧴 Skin Care', class: 'skincare-header', periods: {} },
-      'haircare': { label: '💇 Hair Care', class: 'haircare-header', periods: {} }
-    };
+    const categoryGroups = {};
+    CATEGORIES.forEach(c => {
+      categoryGroups[c.id] = { label: `${c.icon} ${c.name}`, class: c.class, periods: {} };
+    });
 
     // Ensure any custom category added by user is populated in categoryGroups
     filtered.forEach(habit => {
       const cat = habit.category || 'diet';
       if (!categoryGroups[cat]) {
-        categoryGroups[cat] = { label: cat.toUpperCase(), class: 'diet-header', periods: {} };
+        const found = CATEGORIES.find(c => c.id === cat);
+        if (found) {
+          categoryGroups[cat] = { label: `${found.icon} ${found.name}`, class: found.class, periods: {} };
+        } else {
+          categoryGroups[cat] = { label: cat.toUpperCase(), class: 'diet-header', periods: {} };
+        }
       }
       
       const period = this.deriveTimePeriod(habit.time);
@@ -632,7 +698,7 @@ class HabitTrackerApp {
     });
 
     // Determine which categories to render based on the current filter
-    let categoriesToRender = ['diet', 'skincare', 'haircare'];
+    let categoriesToRender = CATEGORIES.map(c => c.id);
     if (this.activeFilter !== 'all') {
       categoriesToRender = [this.activeFilter];
     }
@@ -714,7 +780,7 @@ class HabitTrackerApp {
                 <button class="slot-edit-btn" data-time="${timeSlot}" data-category="${cat}" title="Edit Group" aria-label="Edit this group of habits">
                   <i class="fa-solid fa-pencil"></i>
                 </button>
-                <button class="group-toggle-btn ${allChecked ? 'all-checked' : ''}" data-time="${timeSlot}" data-category="${cat}" aria-label="Mark all habits in slot as complete">
+                <button class="group-toggle-btn ${allChecked ? 'all-checked' : ''}" data-time="${timeSlot}" data-category="${cat}" aria-label="Mark all habits in slot as complete" style="${habits.length > 1 ? '' : 'display: none;'}">
                   ${allChecked ? '✓ Checked All' : 'Toggle All'}
                 </button>
               </div>
@@ -1165,6 +1231,22 @@ class HabitTrackerApp {
     return hours * 60 + minutes;
   }
 
+  requestNotificationPermission() {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }
+
+  getMinutesFrom24HourTime(timeStr) {
+    if (!timeStr) return null;
+    const parts = timeStr.split(':');
+    if (parts.length < 2) return null;
+    const hours = parseInt(parts[0], 10);
+    const minutes = parseInt(parts[1], 10);
+    if (isNaN(hours) || isNaN(minutes)) return null;
+    return hours * 60 + minutes;
+  }
+
   // Habits live notification scheduler check
   startNotificationChecks() {
     const checkScheduleTimes = () => {
@@ -1176,34 +1258,119 @@ class HabitTrackerApp {
       hours = hours ? hours : 12;
       const timeStr = `${String(hours).padStart(2, "0")}:${minutes} ${ampm}`;
 
-      const currentSecs = now.getTime();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
       const dayData = StorageManager.getDayData(this.todayStr) || {};
+      const today = this.todayStr;
 
-      // 1. Standard Due Now Alarms
-      DEFAULT_HABITS.forEach(habit => {
-        const cleanHabitTime = habit.time.split('–')[0].trim();
-        
-        let formattedCheckTime = cleanHabitTime;
-        if (/^\d\:\d{2}/.test(cleanHabitTime)) {
-          formattedCheckTime = "0" + cleanHabitTime;
+      // Initialize persistent notified slots for today to survive refreshes
+      let notifiedSlots = [];
+      try {
+        const stored = localStorage.getItem("notified_slots_" + today);
+        if (stored) {
+          notifiedSlots = JSON.parse(stored);
         }
+      } catch (e) {
+        console.error("Error loading notified slots", e);
+      }
+      const notifiedSet = new Set(notifiedSlots);
 
-        const isHabitDue = timeStr === formattedCheckTime;
-        const alreadyCompleted = dayData[habit.id] === true;
+      const saveNotifiedSlots = () => {
+        localStorage.setItem("notified_slots_" + today, JSON.stringify(Array.from(notifiedSet)));
+      };
 
-        if (isHabitDue && !alreadyCompleted) {
-          const snoozeExpiry = this.snoozedHabits[habit.id];
-          const isSnoozed = snoozeExpiry && currentSecs < snoozeExpiry;
+      // 1. Web Notification Reminders (5 minutes before scheduled times)
+      const upcomingGrouped = {};
+      DEFAULT_HABITS.forEach(habit => {
+        const cleanTime = habit.time.split('–')[0].trim();
+        const scheduledMinutes = this.getMinutesFromTimeString(cleanTime);
+        if (scheduledMinutes === null) return;
 
-          if (!isSnoozed && !this.notifiedHabits.has(habit.id)) {
-            this.showHabitReminderNotification(habit);
-            this.notifiedHabits.add(habit.id);
+        // Reminder time is 5 minutes before scheduled time
+        const reminderMinutes = (scheduledMinutes - 5 + 1440) % 1440;
+        if (currentMinutes === reminderMinutes) {
+          const cat = (habit.category || 'diet').toLowerCase();
+          const key = `${cleanTime}_${cat}`;
+          if (!upcomingGrouped[key]) {
+            upcomingGrouped[key] = {
+              time: cleanTime,
+              category: cat,
+              habits: []
+            };
+          }
+          upcomingGrouped[key].habits.push(habit);
+        }
+      });
+
+      const categoryMetadata = {};
+      CATEGORIES.forEach(c => {
+        categoryMetadata[c.id] = { label: c.name, icon: c.icon };
+      });
+
+      const getCategoryMeta = (cat) => {
+        if (categoryMetadata[cat]) return categoryMetadata[cat];
+        const displayName = cat.split(/[\s-_]+/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+        return { label: displayName, icon: '📋' };
+      };
+
+      // Fire notifications for each slot group
+      Object.keys(upcomingGrouped).forEach(key => {
+        const slot = upcomingGrouped[key];
+        const notifyKey = `reminder_${today}_${key}`;
+
+        if (!notifiedSet.has(notifyKey)) {
+          const meta = getCategoryMeta(slot.category);
+          const pendingHabits = slot.habits.filter(h => dayData[h.id] !== true);
+
+          if (pendingHabits.length > 0) {
+            const title = `${meta.icon} ${meta.label} Reminder`;
+            const body = `Time: ${slot.time}\nUpcoming Habits:\n${pendingHabits.map(h => `• ${h.name}`).join('\n')}\nStay consistent 💪`;
+
+            if ("Notification" in window && Notification.permission === "granted") {
+              try {
+                new Notification(title, { body });
+              } catch (e) {
+                console.error("Failed to show browser notification", e);
+              }
+            }
+
+            // Also keep standard inside-app toast alert
+            this.showHabitReminderNotification(slot.habits[0]);
+
+            notifiedSet.add(notifyKey);
+            saveNotifiedSlots();
           }
         }
       });
 
-      // 2. WhatsApp 10-Minute Meal Warnings
+      // 2. End of Day Summary Notification (5 minutes before sleep time)
       const rawSettings = StorageManager.getRawData().settings || {};
+      const sleepTimeStr = rawSettings.sleepTime || "22:30"; // e.g. "22:30"
+      const sleepMinutes = this.getMinutesFrom24HourTime(sleepTimeStr);
+
+      if (sleepMinutes !== null) {
+        const summaryReminderMinutes = (sleepMinutes - 5 + 1440) % 1440;
+        if (currentMinutes === summaryReminderMinutes) {
+          const notifyKey = `summary_${today}`;
+          if (!notifiedSet.has(notifyKey)) {
+            const stats = StorageManager.getDayCompletionStats(today);
+            const title = `🌙 Daily Habit Summary`;
+            const body = `Today's Completion: ${stats.percent}%\nCompleted: ${stats.completedCount} / ${stats.totalCount} Habits\nGreat job!\nKeep your streak alive tomorrow 🔥`;
+
+            if ("Notification" in window && Notification.permission === "granted") {
+              try {
+                new Notification(title, { body });
+              } catch (e) {
+                console.error("Failed to show browser summary notification", e);
+              }
+            }
+
+            notifiedSet.add(notifyKey);
+            saveNotifiedSlots();
+          }
+        }
+      }
+
+      // 3. WhatsApp 10-Minute Meal Warnings (Legacy)
       const waEnabled = rawSettings.whatsappEnabled === true;
       const waPhone = rawSettings.whatsappPhone || "";
 
@@ -1214,14 +1381,12 @@ class HabitTrackerApp {
           groupedByTime[h.time].push(h);
         });
 
-        const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
         Object.keys(groupedByTime).forEach(timeSlot => {
           const habits = groupedByTime[timeSlot];
           const cleanTime = timeSlot.split('–')[0].trim();
           const scheduledMinutes = this.getMinutesFromTimeString(cleanTime);
           
-          if (scheduledMinutes === null) return; // skip skincare/sleep categories without times
+          if (scheduledMinutes === null) return;
 
           const triggerMinutes = scheduledMinutes - 10;
 
@@ -1245,141 +1410,126 @@ class HabitTrackerApp {
   show10MinWarningNotification(timeSlot, pendingHabits, phone) {
     playNotificationSound();
 
-    const toast = document.createElement('div');
-    toast.className = "notification-toast";
-    toast.style.borderColor = "var(--accent)";
-    
+    const timeSlotClean = timeSlot.replace(/[^a-zA-Z0-9]/g, '');
     const waMsg = `🔔 *Meal Reminder (10m Warning)*: In 10 minutes, it is time to:\n${pendingHabits.map(h => `- ${h.name}`).join('\n')}\n\nConsistency builds results! 💪`;
     const waUrl = `https://wa.me/${phone.replace(/\+/g, '')}?text=${encodeURIComponent(waMsg)}`;
-    const timeSlotClean = timeSlot.replace(/[^a-zA-Z0-9]/g, '');
 
-    toast.innerHTML = `
-      <div class="notification-header">
-        <span class="notification-bell">🔔</span>
-        <span class="notification-title" style="color:var(--accent); font-weight:700;">Meal Warning (10m)</span>
-      </div>
-      <div class="notification-body">
-        In 10 minutes (at <strong>${timeSlot}</strong>), it is time to:
-        <ul style="margin: 6px 0 0 16px; padding: 0; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.4;">
-          ${pendingHabits.map(h => `<li>${h.name}</li>`).join('')}
-        </ul>
-      </div>
-      <div class="notification-actions">
-        <button class="notify-btn dismiss" id="wa-dismiss-${timeSlotClean}">Dismiss</button>
-        <button class="notify-btn complete" id="wa-complete-${timeSlotClean}" style="background:var(--accent); color:#fff;">Mark Done</button>
-        <a href="${waUrl}" target="_blank" class="notify-btn complete" id="wa-send-${timeSlotClean}" style="background:var(--success); color:#fff; text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:600;">📲 Send WhatsApp</a>
-      </div>
+    const bodyHtml = `
+      In 10 minutes (at <strong>${timeSlot}</strong>), it is time to:
+      <ul style="margin: 6px 0 0 16px; padding: 0; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.4;">
+        ${pendingHabits.map(h => `<li>${h.name}</li>`).join('')}
+      </ul>
     `;
 
-    this.dom.notificationContainer.appendChild(toast);
-
-    // Bind event clicks
-    document.getElementById(`wa-dismiss-${timeSlotClean}`).addEventListener('click', () => {
-      this.dismissToast(toast);
-    });
-
-    document.getElementById(`wa-complete-${timeSlotClean}`).addEventListener('click', () => {
-      pendingHabits.forEach(h => {
-        const row = this.dom.timelineSchedule.querySelector(`[data-id="${h.id}"]`);
-        if (row) {
-          const checkbox = row.querySelector('.habit-checkbox-hidden');
-          checkbox.checked = true;
-          this.handleHabitToggle(h.id, true, row, false);
-        } else {
-          StorageManager.setHabitStatus(this.todayStr, h.id, true);
+    showToast({
+      title: "Meal Warning (10m)",
+      bodyHtml: bodyHtml,
+      type: "bell",
+      duration: 3000,
+      actions: [
+        {
+          text: "Dismiss",
+          className: "dismiss",
+          id: `wa-dismiss-${timeSlotClean}`,
+          onClick: (e, dismiss) => {
+            dismiss();
+          }
+        },
+        {
+          text: "Mark Done",
+          className: "complete",
+          id: `wa-complete-${timeSlotClean}`,
+          style: { background: "var(--accent)", color: "#fff" },
+          onClick: (e, dismiss) => {
+            pendingHabits.forEach(h => {
+              const row = this.dom.timelineSchedule.querySelector(`[data-id="${h.id}"]`);
+              if (row) {
+                const checkbox = row.querySelector('.habit-checkbox-hidden');
+                checkbox.checked = true;
+                this.handleHabitToggle(h.id, true, row, false);
+              } else {
+                StorageManager.setHabitStatus(this.todayStr, h.id, true);
+              }
+            });
+            playSuccessChime();
+            this.updateDashboardProgress();
+            dismiss();
+          }
+        },
+        {
+          text: "📲 Send WhatsApp",
+          className: "complete",
+          id: `wa-send-${timeSlotClean}`,
+          style: { background: "var(--success)", color: "#fff", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px", fontWeight: "600" },
+          onClick: (e, dismiss) => {
+            window.open(waUrl, '_blank');
+            this.showLocalNotification("WhatsApp Alert", "Redirected to WhatsApp message dispatch.", "success");
+          }
         }
-      });
-      playSuccessChime();
-      this.updateDashboardProgress();
-      this.dismissToast(toast);
-    });
-
-    document.getElementById(`wa-send-${timeSlotClean}`).addEventListener('click', () => {
-      this.showLocalNotification("WhatsApp Alert", "Redirected to WhatsApp message dispatch.", "success");
+      ]
     });
   }
-
 
   showHabitReminderNotification(habit) {
     playNotificationSound();
 
-    const toast = document.createElement('div');
-    toast.className = "notification-toast";
-    toast.innerHTML = `
-      <div class="notification-header">
-        <span class="notification-bell">🔔</span>
-        <span class="notification-title">Habit Reminder</span>
-      </div>
-      <div class="notification-body">
-        Time to complete your habit: <strong>${habit.name}</strong> (${habit.time})
-      </div>
-      <div class="notification-actions">
-        <button class="notify-btn dismiss" id="dismiss-${habit.id.replace(/[^a-zA-Z0-9]/g, '')}">Dismiss</button>
-        <button class="notify-btn snooze" id="snooze-${habit.id.replace(/[^a-zA-Z0-9]/g, '')}">Snooze 10m</button>
-        <button class="notify-btn complete" id="complete-${habit.id.replace(/[^a-zA-Z0-9]/g, '')}">Complete</button>
-      </div>
-    `;
-
-    this.dom.notificationContainer.appendChild(toast);
-
-    // Event hooks
     const escapeId = habit.id.replace(/[^a-zA-Z0-9]/g, '');
-    
-    document.getElementById(`dismiss-${escapeId}`).addEventListener('click', () => {
-      this.dismissToast(toast);
-    });
+    const bodyHtml = `Time to complete your habit: <strong>${habit.name}</strong> (${habit.time})`;
 
-    document.getElementById(`snooze-${escapeId}`).addEventListener('click', () => {
-      // Snooze for 10 minutes in milliseconds
-      this.snoozedHabits[habit.id] = new Date().getTime() + 10 * 60 * 1000;
-      this.notifiedHabits.delete(habit.id); // clear from notified set to trigger again later
-      this.dismissToast(toast);
-      this.showLocalNotification("Snoozed", `Reminding you in 10 minutes for ${habit.name}.`, "info");
+    showToast({
+      title: "Habit Reminder",
+      bodyHtml: bodyHtml,
+      type: "bell",
+      duration: 3000,
+      actions: [
+        {
+          text: "Dismiss",
+          className: "dismiss",
+          id: `dismiss-${escapeId}`,
+          onClick: (e, dismiss) => {
+            dismiss();
+          }
+        },
+        {
+          text: "Snooze 10m",
+          className: "snooze",
+          id: `snooze-${escapeId}`,
+          onClick: (e, dismiss) => {
+            this.snoozedHabits[habit.id] = new Date().getTime() + 10 * 60 * 1000;
+            this.notifiedHabits.delete(habit.id);
+            dismiss();
+            this.showLocalNotification("Snoozed", `Reminding you in 10 minutes for ${habit.name}.`, "info");
+          }
+        },
+        {
+          text: "Complete",
+          className: "complete",
+          id: `complete-${escapeId}`,
+          onClick: (e, dismiss) => {
+            const timelineRow = this.dom.timelineSchedule.querySelector(`[data-id="${habit.id}"]`);
+            if (timelineRow) {
+              const checkbox = timelineRow.querySelector('.habit-checkbox-hidden');
+              checkbox.checked = true;
+              this.handleHabitToggle(habit.id, true, timelineRow);
+            } else {
+              StorageManager.setHabitStatus(this.todayStr, habit.id, true);
+              playSuccessChime();
+              this.updateDashboardProgress();
+            }
+            dismiss();
+          }
+        }
+      ]
     });
-
-    document.getElementById(`complete-${escapeId}`).addEventListener('click', () => {
-      const timelineRow = this.dom.timelineSchedule.querySelector(`[data-id="${habit.id}"]`);
-      if (timelineRow) {
-        const checkbox = timelineRow.querySelector('.habit-checkbox-hidden');
-        checkbox.checked = true;
-        this.handleHabitToggle(habit.id, true, timelineRow);
-      } else {
-        // Fallback if not rendered
-        StorageManager.setHabitStatus(this.todayStr, habit.id, true);
-        playSuccessChime();
-        this.updateDashboardProgress();
-      }
-      this.dismissToast(toast);
-    });
-  }
-
-  dismissToast(toastEl) {
-    toastEl.classList.add('dismissing');
-    setTimeout(() => {
-      if (toastEl.parentNode) {
-        this.dom.notificationContainer.removeChild(toastEl);
-      }
-    }, 300);
   }
 
   showLocalNotification(title, message, type = "info") {
-    const toast = document.createElement('div');
-    toast.className = "notification-toast";
-    
-    let emoji = "ℹ️";
-    if (type === "success") emoji = "✅";
-    else if (type === "warning") emoji = "⚠️";
-
-    toast.innerHTML = `
-      <div class="notification-header">
-        <span>${emoji}</span>
-        <span class="notification-title">${title}</span>
-      </div>
-      <div class="notification-body">${message}</div>
-    `;
-
-    this.dom.notificationContainer.appendChild(toast);
-    setTimeout(() => this.dismissToast(toast), 4000);
+    showToast({
+      title,
+      message,
+      type,
+      duration: 3000
+    });
   }
 
   // PWA Add-to-Homescreen promo integration
@@ -1455,7 +1605,7 @@ class HabitTrackerApp {
   openScheduleCreator() {
     this.editingTimeSlot = null;
     this.editingCategory = null;
-    this.editorCategory = 'diet';
+    this.editorCategory = CATEGORIES[0].id;
     this.editorHabitList = [];
 
     this.dom.scheduleModalTitle.innerHTML = `<i class="fa-solid fa-calendar-day"></i> Add New Routine`;
@@ -1469,7 +1619,7 @@ class HabitTrackerApp {
     if (pillsSelector) {
       pillsSelector.querySelectorAll('.category-pill-btn').forEach(btn => {
         const cat = btn.getAttribute('data-category');
-        btn.classList.toggle('active', cat === 'diet');
+        btn.classList.toggle('active', cat === CATEGORIES[0].id);
       });
     }
 
@@ -1538,6 +1688,16 @@ class HabitTrackerApp {
 
     const newTimeSlot = this.convertTo12Hour(rawTime);
     const category = this.editorCategory;
+
+    // Auto-add pending text if present
+    const pendingText = this.dom.newHabitItemInput.value.trim();
+    if (pendingText.length > 0) {
+      const isDuplicate = this.editorHabitList.some(item => item.name.toLowerCase() === pendingText.toLowerCase());
+      if (!isDuplicate) {
+        this.editorHabitList.push({ name: pendingText });
+      }
+      this.dom.newHabitItemInput.value = "";
+    }
 
     if (this.editorHabitList.length === 0) {
       this.showLocalNotification("Validation Error", "Please add at least one habit item.", "warning");
@@ -1682,7 +1842,7 @@ class HabitTrackerApp {
         
         setTimeout(() => {
           window.location.href = href;
-        }, 150);
+        }, 50);
       });
     });
   }

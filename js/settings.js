@@ -12,7 +12,8 @@ import {
   playSuccessChime,
   downloadCSVReport,
   exportPDFReport,
-  registerServiceWorker
+  registerServiceWorker,
+  showToast
 } from './utils.js';
 
 class SettingsPageController {
@@ -33,6 +34,7 @@ class SettingsPageController {
 
       // Form fields
       userNameInput: document.getElementById('userNameInput'),
+      sleepTimeInput: document.getElementById('sleepTimeInput'),
       soundsToggleInput: document.getElementById('soundsToggleInput'),
       themeToggleSwitch: document.getElementById('themeToggleSwitch'),
       whatsappToggleInput: document.getElementById('whatsappToggleInput'),
@@ -46,6 +48,7 @@ class SettingsPageController {
       exportJsonBtn: document.getElementById('exportJsonBtn'),
 
       // Reporting
+      reportMonthInput: document.getElementById('reportMonthInput'),
       exportCsvBtn: document.getElementById('exportCsvBtn'),
       exportPdfBtn: document.getElementById('exportPdfBtn'),
 
@@ -90,6 +93,17 @@ class SettingsPageController {
       userName = settings.userName;
     }
     this.dom.userNameInput.value = userName;
+
+    // Sleep Time (default "22:30")
+    this.dom.sleepTimeInput.value = settings.sleepTime || "22:30";
+
+    // Default month selector to current month
+    const todayDateObj = new Date();
+    const curYear = todayDateObj.getFullYear();
+    const curMonth = String(todayDateObj.getMonth() + 1).padStart(2, "0");
+    if (this.dom.reportMonthInput) {
+      this.dom.reportMonthInput.value = `${curYear}-${curMonth}`;
+    }
 
     // Sounds
     this.dom.soundsToggleInput.checked = settings.sounds !== false;
@@ -138,6 +152,13 @@ class SettingsPageController {
           createdAt: new Date().toISOString()
         });
       }
+    });
+
+    // Sleep time config save on change
+    this.dom.sleepTimeInput.addEventListener('change', (e) => {
+      const val = e.target.value || "22:30";
+      this.saveSettingKey("sleepTime", val);
+      this.showLocalToast("Sleep Time Updated", `Daily summary scheduled at 5 minutes before ${val}.`, "success");
     });
 
     // Sound toggle config save on change
@@ -235,60 +256,67 @@ class SettingsPageController {
     });
 
     // Export JSON
-    this.dom.exportJsonBtn.addEventListener('click', () => {
-      try {
-        const data = StorageManager.exportData();
-        const blob = new Blob([data], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `HabitTracker_DatabaseBackup_${this.todayStr}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        this.showLocalToast("Export Successful", "Database backup file downloaded.", "success");
-      } catch (err) {
-        this.showLocalToast("Export Failed", "Error creating backup file.", "warning");
-      }
-    });
+    if (this.dom.exportJsonBtn) {
+      this.dom.exportJsonBtn.addEventListener('click', () => {
+        try {
+          const data = StorageManager.exportData();
+          const blob = new Blob([data], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `HabitTracker_DatabaseBackup_${this.todayStr}.json`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          this.showLocalToast("Export Successful", "Database backup file downloaded.", "success");
+        } catch (err) {
+          this.showLocalToast("Export Failed", "Error creating backup file.", "warning");
+        }
+      });
+    }
 
     // Import JSON File Picker
-    this.dom.importJsonBtn.addEventListener('click', () => {
-      this.dom.importJsonFileInput.click();
-    });
+    if (this.dom.importJsonBtn) {
+      this.dom.importJsonBtn.addEventListener('click', () => {
+        this.dom.importJsonFileInput.click();
+      });
+    }
 
-    this.dom.importJsonFileInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
+    if (this.dom.importJsonFileInput) {
+      this.dom.importJsonFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
 
-      if (this.dom.loadingOverlay) {
-        this.dom.loadingOverlay.classList.remove('fade-out');
-      }
+        if (this.dom.loadingOverlay) {
+          this.dom.loadingOverlay.classList.remove('fade-out');
+        }
 
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const text = event.target.result;
-        const success = StorageManager.importData(text);
-        
-        setTimeout(() => {
-          if (success) {
-            playSuccessChime();
-            this.showLocalToast("Restore Complete", "Data imported successfully. Reloading workspace...", "success");
-            setTimeout(() => {
-              window.location.reload();
-            }, 1000);
-          } else {
-            this.showLocalToast("Restore Failed", "Invalid backup file or corrupted format.", "warning");
-            if (this.dom.loadingOverlay) {
-              this.dom.loadingOverlay.classList.add('fade-out');
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const text = event.target.result;
+          const success = StorageManager.importData(text);
+          
+          setTimeout(() => {
+            if (success) {
+              playSuccessChime();
+              this.showLocalToast("Restore Complete", "Data imported successfully. Reloading workspace...", "success");
+              setTimeout(() => {
+                window.location.reload();
+              }, 1000);
+            } else {
+              this.showLocalToast("Restore Failed", "Invalid backup file or corrupted format.", "warning");
+              if (this.dom.loadingOverlay) {
+                this.dom.loadingOverlay.classList.add('fade-out');
+              }
             }
-          }
-        }, 500);
-      };
-      reader.readAsText(file);
-    });
+          }, 500);
+        };
+        reader.readAsText(file);
+      });
+    }
 
     this.dom.exportCsvBtn.addEventListener('click', () => {
+      const selectedMonth = this.dom.reportMonthInput ? this.dom.reportMonthInput.value : "";
       if (this.dom.loadingOverlay) {
         this.dom.loadingOverlay.classList.remove('fade-out');
       }
@@ -297,10 +325,13 @@ class SettingsPageController {
         const historyOnly = {};
         Object.keys(data).forEach(k => {
           if (/^\d{4}-\d{2}-\d{2}$/.test(k)) {
+            if (selectedMonth && !k.startsWith(selectedMonth)) {
+              return;
+            }
             historyOnly[k] = data[k];
           }
         });
-        downloadCSVReport(historyOnly);
+        downloadCSVReport(historyOnly, selectedMonth);
         this.showLocalToast("CSV Generated", "Spreadsheet report download started.", "success");
         if (this.dom.loadingOverlay) {
           this.dom.loadingOverlay.classList.add('fade-out');
@@ -310,11 +341,12 @@ class SettingsPageController {
 
     // Export PDF Print View
     this.dom.exportPdfBtn.addEventListener('click', () => {
+      const selectedMonth = this.dom.reportMonthInput ? this.dom.reportMonthInput.value : "";
       if (this.dom.loadingOverlay) {
         this.dom.loadingOverlay.classList.remove('fade-out');
       }
       setTimeout(() => {
-        exportPDFReport();
+        exportPDFReport(selectedMonth);
         if (this.dom.loadingOverlay) {
           this.dom.loadingOverlay.classList.add('fade-out');
         }
@@ -338,30 +370,12 @@ class SettingsPageController {
   }
 
   showLocalToast(title, message, type = "info") {
-    const toast = document.createElement('div');
-    toast.className = "notification-toast";
-
-    let emoji = "ℹ️";
-    if (type === "warning") emoji = "⚠️";
-    else if (type === "success") emoji = "✅";
-
-    toast.innerHTML = `
-      <div class="notification-header">
-        <span>${emoji}</span>
-        <span class="notification-title">${title}</span>
-      </div>
-      <div class="notification-body">${message}</div>
-    `;
-
-    this.dom.notificationContainer.appendChild(toast);
-    setTimeout(() => {
-      toast.classList.add('dismissing');
-      setTimeout(() => {
-        if (toast.parentNode) {
-          this.dom.notificationContainer.removeChild(toast);
-        }
-      }, 300);
-    }, 3500);
+    showToast({
+      title,
+      message,
+      type,
+      duration: 3000
+    });
   }
 
   setupPageTransitions() {
@@ -370,7 +384,7 @@ class SettingsPageController {
       if (this.dom.loadingOverlay) {
         this.dom.loadingOverlay.classList.add('fade-out');
       }
-    }, 300);
+    }, 50);
 
     const navLinks = document.querySelectorAll('.bottom-nav-item, .nav-links a, .nav-brand');
     navLinks.forEach(link => {
@@ -391,7 +405,7 @@ class SettingsPageController {
         
         setTimeout(() => {
           window.location.href = href;
-        }, 150);
+        }, 50);
       });
     });
   }

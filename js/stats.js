@@ -3,7 +3,7 @@
  * Calculates advanced analytics, ranks habits, and renders custom SVG line/bar charts without external libraries.
  */
 
-import { DEFAULT_HABITS, StorageManager } from './storage.js';
+import { DEFAULT_HABITS, StorageManager, CATEGORIES } from './storage.js';
 import { 
   formatHeaderDate, 
   updateDigitalClock, 
@@ -29,10 +29,9 @@ class StatsPageController {
       themeToggleBtn: document.getElementById('themeToggleBtn'),
       
       // Metric fields
-      todayScoreVal: document.getElementById('todayScoreVal'),
-      todayScoreFraction: document.getElementById('todayScoreFraction'),
+      trackedDaysVal: document.getElementById('trackedDaysVal'),
+      trackedDaysFooter: document.getElementById('trackedDaysFooter'),
       avgRateVal: document.getElementById('avgRateVal'),
-      trackedDaysCount: document.getElementById('trackedDaysCount'),
       currentStreakVal: document.getElementById('currentStreakVal'),
       currentStreakSubtext: document.getElementById('currentStreakSubtext'),
       longestStreakVal: document.getElementById('longestStreakVal'),
@@ -40,6 +39,8 @@ class StatsPageController {
       // Charts
       weeklyChartContainer: document.getElementById('weeklyChartContainer'),
       categoryChartContainer: document.getElementById('categoryChartContainer'),
+      todayProgressBreakdown: document.getElementById('todayProgressBreakdown'),
+      categoryLeaderboardList: document.getElementById('categoryLeaderboardList'),
       
       // Lists
       consistentHabitsList: document.getElementById('consistentHabitsList'),
@@ -79,6 +80,8 @@ class StatsPageController {
     this.calculateMetrics();
     this.renderCharts();
 
+
+
     this.setupPageTransitions();
   }
 
@@ -87,15 +90,14 @@ class StatsPageController {
     const dates = Object.keys(rawData).filter(key => /^\d{4}-\d{2}-\d{2}$/.test(key));
     const totalDaysCount = dates.length;
 
-    // Today's Score
-    const todayStats = StorageManager.getDayCompletionStats(this.todayStr);
-    this.dom.todayScoreVal.textContent = `${todayStats.percent}%`;
-    this.dom.todayScoreFraction.textContent = `${todayStats.completedCount} / ${todayStats.totalCount} completed`;
-
     // Streaks
     const streaks = StorageManager.getStreakMetrics();
     this.dom.currentStreakVal.innerHTML = `${streaks.currentStreak} <span>Days</span>`;
     this.dom.longestStreakVal.innerHTML = `${streaks.longestStreak} <span>Days</span>`;
+
+    // Days Tracked
+    this.dom.trackedDaysVal.innerHTML = `${totalDaysCount} <span>Days</span>`;
+    this.dom.trackedDaysFooter.textContent = totalDaysCount === 1 ? "1 day logged" : `${totalDaysCount} total records`;
 
     // Average Rate
     let sumPercentages = 0;
@@ -106,7 +108,6 @@ class StatsPageController {
 
     const averageRate = totalDaysCount > 0 ? Math.round(sumPercentages / totalDaysCount) : 0;
     this.dom.avgRateVal.textContent = `${averageRate}%`;
-    this.dom.trackedDaysCount.textContent = `${totalDaysCount} day${totalDaysCount === 1 ? '' : 's'} tracked`;
 
     // Extremes (Best and Worst Days)
     if (totalDaysCount > 0) {
@@ -132,10 +133,65 @@ class StatsPageController {
       this.dom.worstDayDate.textContent = worstDateObj.toLocaleDateString("en-GB", { day: '2-digit', month: 'short', year: 'numeric' });
       this.dom.worstDayName.textContent = worstDateObj.toLocaleDateString("en-GB", { weekday: 'long' });
       this.dom.worstDayScore.textContent = `${worstDay.percent}%`;
+    } else {
+      this.dom.bestDayDate.textContent = "No Data";
+      this.dom.bestDayName.textContent = "No entries tracked";
+      this.dom.bestDayScore.textContent = "0%";
+      this.dom.worstDayDate.textContent = "No Data";
+      this.dom.worstDayName.textContent = "No entries tracked";
+      this.dom.worstDayScore.textContent = "0%";
     }
 
     // Habit Consistency Calculations
     this.calculateHabitConsistency(rawData, dates);
+    
+    // Today's Progress Breakdown
+    this.calculateTodayBreakdown(rawData);
+  }
+
+  calculateTodayBreakdown(rawData) {
+    this.dom.todayProgressBreakdown.innerHTML = "";
+
+    if (DEFAULT_HABITS.length === 0) {
+      this.dom.todayProgressBreakdown.innerHTML = `<span style="font-size:0.85rem;color:var(--text-muted);">No routines scheduled for today.</span>`;
+      return;
+    }
+
+    let overallCompleted = 0;
+    let overallTotal = 0;
+
+    // Filter categories that actually have habits defined today
+    const activeCategories = CATEGORIES.filter(cat => {
+      const stats = StorageManager.getCategoryStats(this.todayStr, cat.id);
+      return stats.total > 0;
+    });
+
+    activeCategories.forEach(c => {
+      const stats = StorageManager.getCategoryStats(this.todayStr, c.id);
+      overallCompleted += stats.completed;
+      overallTotal += stats.total;
+
+      const row = document.createElement('div');
+      row.className = "today-breakdown-row";
+      row.innerHTML = `
+        <div class="today-breakdown-meta">
+          <span style="font-weight:600;"><span style="color:${c.color}; font-size:1.1rem; margin-right:4px;">${c.icon}</span>${c.name}</span>
+          <span style="font-weight:700;">${stats.completed} / ${stats.total}</span>
+        </div>
+      `;
+      this.dom.todayProgressBreakdown.appendChild(row);
+    });
+
+    const overallRate = overallTotal > 0 ? Math.round((overallCompleted / overallTotal) * 100) : 0;
+    const overallRow = document.createElement('div');
+    overallRow.className = "today-breakdown-row today-breakdown-overall";
+    overallRow.innerHTML = `
+      <div class="today-breakdown-meta">
+        <span>Overall</span>
+        <span style="color:var(--success); font-weight:800;">${overallCompleted} / ${overallTotal} (${overallRate}%)</span>
+      </div>
+    `;
+    this.dom.todayProgressBreakdown.appendChild(overallRow);
   }
 
   calculateHabitConsistency(rawData, dates) {
@@ -182,12 +238,19 @@ class StatsPageController {
 
   renderHabitAnalytics(list, containerEl, isMissed = false) {
     containerEl.innerHTML = "";
-    list.forEach(item => {
+    if (list.length === 0) {
+      containerEl.innerHTML = `<span style="font-size:0.85rem;color:var(--text-muted);">No routines defined.</span>`;
+      return;
+    }
+
+    const medals = ['🥇', '🥈', '🥉'];
+    list.forEach((item, idx) => {
+      const medal = isMissed ? '' : (medals[idx] ? medals[idx] + ' ' : '');
       const row = document.createElement('div');
       row.className = "habit-analytics-row";
       row.innerHTML = `
         <div class="habit-analytics-left">
-          <span class="habit-analytics-name">${item.name}</span>
+          <span class="habit-analytics-name">${medal}${item.name}</span>
           <span class="habit-analytics-meta">${item.completedCount} completions across all records</span>
         </div>
         <div class="analytics-percent-badge ${isMissed ? 'danger-badge' : ''}">${item.rate}%</div>
@@ -203,6 +266,19 @@ class StatsPageController {
 
   renderWeeklyTrendChart() {
     this.dom.weeklyChartContainer.innerHTML = "";
+
+    const rawData = StorageManager.getRawData();
+    const dates = Object.keys(rawData).filter(key => /^\d{4}-\d{2}-\d{2}$/.test(key));
+
+    if (dates.length === 0) {
+      this.dom.weeklyChartContainer.innerHTML = `
+        <div style="text-align: center; padding: 40px 10px; color: var(--text-secondary); width: 100%;">
+          <span style="font-size: 0.9rem; font-weight: 500;">No analytics available yet.</span>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 6px;">Complete your habits for a few days to unlock insights.</p>
+        </div>
+      `;
+      return;
+    }
 
     // Generate last 7 days dates YYYY-MM-DD
     const last7Days = [];
@@ -355,107 +431,72 @@ class StatsPageController {
     const dates = Object.keys(rawData).filter(key => /^\d{4}-\d{2}-\d{2}$/.test(key));
     const totalDays = dates.length;
 
-    // Categories structure definition
-    const categories = {
-      morning: { label: "Morning", total: 0, completed: 0 },
-      afternoon: { label: "Afternoon", total: 0, completed: 0 },
-      evening: { label: "Evening", total: 0, completed: 0 },
-      skincare: { label: "Skincare", total: 0, completed: 0 },
-      night: { label: "Night Routine", total: 0, completed: 0 }
-    };
-
     if (totalDays === 0) {
-      this.dom.categoryChartContainer.innerHTML = `<span style="font-size:0.85rem;color:var(--text-muted);">No entries tracked yet.</span>`;
+      this.dom.categoryChartContainer.innerHTML = `
+        <div style="text-align: center; padding: 40px 10px; color: var(--text-secondary); width: 100%;">
+          <span style="font-size: 0.9rem; font-weight: 500;">No analytics available yet.</span>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 6px;">Complete your habits for a few days to unlock insights.</p>
+        </div>
+      `;
+      if (this.dom.categoryLeaderboardList) {
+        this.dom.categoryLeaderboardList.innerHTML = `<span style="font-size:0.85rem;color:var(--text-muted);">No entries tracked yet.</span>`;
+      }
       return;
     }
 
-    // Accumulate total possible checklist counters vs checked count
-    dates.forEach(dStr => {
-      const dayData = rawData[dStr];
-      DEFAULT_HABITS.forEach(habit => {
-        const cat = habit.category;
-        if (categories[cat]) {
-          categories[cat].total++;
-          if (dayData[habit.id] === true) {
-            categories[cat].completed++;
-          }
-        }
-      });
-    });
-
-    // Prepare chart rows
-    const dataRows = Object.keys(categories).map(key => {
-      const item = categories[key];
-      const rate = item.total > 0 ? Math.round((item.completed / item.total) * 100) : 0;
+    // Map each category to its current day statistics
+    const sortedCategories = CATEGORIES.map(c => {
+      const stats = StorageManager.getCategoryStats(this.todayStr, c.id);
       return {
-        label: item.label,
-        rate
+        cat: c.id,
+        rate: stats.percentage,
+        completed: stats.completed,
+        total: stats.total,
+        meta: { label: `${c.icon} ${c.name}`, color: c.color }
       };
+    }).filter(item => item.total > 0); // only show categories with scheduled habits
+
+    sortedCategories.forEach(item => {
+      const strengthRow = document.createElement('div');
+      strengthRow.style.width = "100%";
+      strengthRow.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <span style="font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
+            <span style="font-size: 1.15rem;">${item.meta.label.split(' ')[0]}</span>
+            <span>${item.meta.label.substring(item.meta.label.indexOf(' ') + 1)}</span>
+          </span>
+          <span style="font-weight: 700; color: var(--accent);">${item.rate}%</span>
+        </div>
+        <div class="card-progress-bar-bg" style="height: 8px; margin-top: 0;">
+          <div class="card-progress-bar-fill high" style="width: ${item.rate}%; background-color: ${item.meta.color};"></div>
+        </div>
+        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 6px;">
+          ${item.completed} / ${item.total} Habits
+        </div>
+      `;
+      this.dom.categoryChartContainer.appendChild(strengthRow);
     });
 
-    // Render bar list dynamically as responsive vector nodes
-    const svgNS = "http://www.w3.org/2000/svg";
-    const svg = document.createElementNS(svgNS, "svg");
-    svg.setAttribute("class", "chart-svg");
-    svg.setAttribute("viewBox", "0 0 500 240");
-
-    const paddingLeft = 100;
-    const paddingRight = 50;
-    const paddingTop = 20;
-    const paddingBottom = 20;
-
-    const chartWidth = 500 - paddingLeft - paddingRight;
-    const chartHeight = 240 - paddingTop - paddingBottom;
-    const barSpacing = chartHeight / dataRows.length;
-    const barHeight = 16;
-
-    dataRows.forEach((row, idx) => {
-      const y = paddingTop + idx * barSpacing + (barSpacing - barHeight) / 2;
-
-      // Label Category
-      const label = document.createElementNS(svgNS, "text");
-      label.setAttribute("x", paddingLeft - 12);
-      label.setAttribute("y", y + 12);
-      label.setAttribute("text-anchor", "end");
-      label.setAttribute("font-size", "11px");
-      label.setAttribute("font-weight", "600");
-      label.setAttribute("fill", "var(--text-primary)");
-      label.textContent = row.label;
-      svg.appendChild(label);
-
-      // Background bar track
-      const barTrack = document.createElementNS(svgNS, "rect");
-      barTrack.setAttribute("x", paddingLeft);
-      barTrack.setAttribute("y", y);
-      barTrack.setAttribute("width", chartWidth);
-      barTrack.setAttribute("height", barHeight);
-      barTrack.setAttribute("rx", "4");
-      barTrack.setAttribute("fill", "var(--border-color)");
-      svg.appendChild(barTrack);
-
-      // Active fill bar
-      const barFillWidth = (row.rate / 100) * chartWidth;
-      const barFill = document.createElementNS(svgNS, "rect");
-      barFill.setAttribute("x", paddingLeft);
-      barFill.setAttribute("y", y);
-      barFill.setAttribute("width", barFillWidth);
-      barFill.setAttribute("height", barHeight);
-      barFill.setAttribute("rx", "4");
-      barFill.setAttribute("fill", "var(--primary)");
-      svg.appendChild(barFill);
-
-      // Label Percentage text next to bar
-      const labelPercent = document.createElementNS(svgNS, "text");
-      labelPercent.setAttribute("x", paddingLeft + barFillWidth + 8);
-      labelPercent.setAttribute("y", y + 12);
-      labelPercent.setAttribute("font-size", "11px");
-      labelPercent.setAttribute("font-weight", "700");
-      labelPercent.setAttribute("fill", "var(--accent)");
-      labelPercent.textContent = `${row.rate}%`;
-      svg.appendChild(labelPercent);
-    });
-
-    this.dom.categoryChartContainer.appendChild(svg);
+    // Populate Leaderboard list
+    if (this.dom.categoryLeaderboardList) {
+      this.dom.categoryLeaderboardList.innerHTML = "";
+      const leaderboardData = [...sortedCategories].sort((a, b) => b.rate - a.rate || b.completed - a.completed);
+      const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣'];
+      
+      leaderboardData.forEach((item, idx) => {
+        const medal = medals[idx] ? medals[idx] + ' ' : `${idx + 1} `;
+        const row = document.createElement('div');
+        row.className = "leaderboard-row";
+        row.innerHTML = `
+          <div class="leaderboard-info">
+            <span class="leaderboard-rank">${medal}</span>
+            <span class="leaderboard-name">${item.meta.label.substring(item.meta.label.indexOf(' ') + 1)}</span>
+          </div>
+          <span class="leaderboard-rate">${item.rate}%</span>
+        `;
+        this.dom.categoryLeaderboardList.appendChild(row);
+      });
+    }
   }
 
   setupPageTransitions() {
@@ -464,7 +505,7 @@ class StatsPageController {
       if (this.dom.loadingOverlay) {
         this.dom.loadingOverlay.classList.add('fade-out');
       }
-    }, 300);
+    }, 50);
 
     const navLinks = document.querySelectorAll('.bottom-nav-item, .nav-links a, .nav-brand');
     navLinks.forEach(link => {
@@ -485,7 +526,7 @@ class StatsPageController {
         
         setTimeout(() => {
           window.location.href = href;
-        }, 150);
+        }, 50);
       });
     });
   }

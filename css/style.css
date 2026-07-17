@@ -1055,7 +1055,7 @@ h6 {
 /* Elegant Notification Popup */
 .notification-container {
   position: fixed;
-  bottom: 24px;
+  top: 24px;
   right: 24px;
   z-index: 9999;
   display: flex;
@@ -1063,6 +1063,15 @@ h6 {
   gap: 12px;
   max-width: 380px;
   width: calc(100% - 48px);
+  pointer-events: none; /* Allows click-through for empty areas */
+}
+
+@media (max-width: 480px) {
+  .notification-container {
+    top: 16px;
+    right: 16px;
+    width: calc(100% - 32px);
+  }
 }
 
 .notification-toast {
@@ -1076,19 +1085,47 @@ h6 {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  animation: slide-in-right var(--transition-normal);
-  transition: all var(--transition-normal);
+  position: relative;
+  pointer-events: auto; /* Re-enable pointer events on the toast itself */
+  animation: toast-slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Toast Close Button */
+.toast-close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.25rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px;
+  border-radius: 50%;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  z-index: 10;
+}
+
+.toast-close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
 }
 
 .notification-toast.dismissing {
-  transform: translateX(120%);
-  opacity: 0;
+  animation: toast-slide-out 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .notification-header {
   display: flex;
   align-items: center;
   gap: 10px;
+  padding-right: 24px; /* Space for close button */
 }
 
 .notification-bell {
@@ -1157,12 +1194,16 @@ h6 {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: var(--bg-color);
+  background: rgba(10, 15, 30, 0.85);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
   z-index: 11000;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  transition: opacity var(--transition-slow);
+  gap: 8px;
+  transition: opacity var(--transition-normal);
 }
 
 .loading-overlay.fade-out {
@@ -1171,12 +1212,32 @@ h6 {
 }
 
 .spinner {
-  width: 48px;
-  height: 48px;
-  border: 3.5px solid var(--border-color);
+  width: 54px;
+  height: 54px;
+  border: 3px solid rgba(59, 130, 246, 0.08);
   border-radius: 50%;
-  border-top-color: var(--primary);
-  animation: spin 1s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite;
+  border-top-color: var(--accent);
+  border-right-color: var(--accent);
+  animation: spin 0.75s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite;
+  filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.3));
+  margin-bottom: 12px;
+}
+
+.loading-overlay::before {
+  content: 'Loading...';
+  color: var(--text-primary);
+  font-family: 'Poppins', sans-serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.loading-overlay::after {
+  content: 'Preparing your habits...';
+  color: var(--text-muted);
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 500;
 }
 
 /* Animations */
@@ -1235,6 +1296,28 @@ h6 {
   to {
     transform: translateX(0);
     opacity: 1;
+  }
+}
+
+@keyframes toast-slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toast-slide-out {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
   }
 }
 
@@ -2446,6 +2529,46 @@ h6 {
   font-weight: 600;
 }
 
+/* Controls Dropdowns layout */
+.controls-dropdowns-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.category-filter-wrapper {
+  position: relative;
+  display: none; /* Hidden on desktop/tablet */
+}
+
+.category-option {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 8px 12px;
+  border-radius: 8px;
+  text-align: left;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.category-option:hover {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-primary);
+}
+
+.category-option.active {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* Filter Chips styling */
 .filter-chips-container {
   display: flex;
@@ -3394,8 +3517,17 @@ h6 {
   .search-icon {
     left: 12px !important;
   }
-  .sort-wrapper {
+  .controls-dropdowns-group {
+    display: flex !important;
     width: 100% !important;
+    gap: 8px !important;
+  }
+  .sort-wrapper, .category-filter-wrapper {
+    flex: 1 !important;
+    width: auto !important;
+  }
+  .category-filter-wrapper {
+    display: block !important;
   }
   .sort-dropdown-trigger {
     width: 100% !important;
@@ -3410,22 +3542,12 @@ h6 {
     background: var(--card-bg) !important;
     border-radius: 8px !important;
     box-shadow: var(--shadow-md) !important;
+    left: 0 !important;
+    right: auto !important;
   }
 
-  /* Category Chips horizontal scroll fix */
+  /* Category Chips hidden on mobile */
   .filter-chips-container {
-    display: flex !important;
-    gap: 6px !important;
-    overflow-x: auto !important;
-    white-space: nowrap !important;
-    padding: 8px 12px !important;
-    border-radius: 12px !important;
-    background: var(--card-bg) !important;
-    margin-bottom: 16px !important;
-    scrollbar-width: none !important;
-    -webkit-overflow-scrolling: touch !important;
-  }
-  .filter-chips-container::-webkit-scrollbar {
     display: none !important;
   }
   .filter-chip {
@@ -3642,4 +3764,80 @@ h6 {
     padding: 8px 12px !important;
     border-radius: 8px !important;
   }
+}
+
+/* --- Expanded Categories (Routine & Others) --- */
+
+/* Routine Category styles */
+.category-section-container.category-routine {
+  background: rgba(59, 130, 246, 0.02);
+  border-color: rgba(59, 130, 246, 0.15);
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.02);
+}
+[data-theme="light"] .category-section-container.category-routine {
+  background: rgba(59, 130, 246, 0.04);
+}
+.dashboard-category-title.routine-header {
+  color: #3B82F6;
+  border-bottom-color: rgba(59, 130, 246, 0.25);
+}
+.category-routine .category-empty-placeholder { border-color: rgba(59, 130, 246, 0.15); }
+.category-routine .period-list-container { border-left-color: rgba(59, 130, 246, 0.15); }
+.category-routine .dashboard-period-title::before { border-color: rgba(59, 130, 246, 0.4); background: #3B82F6; }
+.category-routine .time-slot-group-card { border-left: 4px solid #3B82F6; }
+.category-routine .time-slot-title { color: #3B82F6; }
+.category-routine .group-toggle-btn:hover {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3B82F6;
+  border-color: #3B82F6;
+}
+.category-routine .group-toggle-btn.all-checked {
+  background: #3B82F6;
+  color: #FFFFFF;
+  border-color: #3B82F6;
+}
+.category-routine .habit-checkbox-hidden:checked~.checkbox-display {
+  background-color: #3B82F6;
+  border-color: #3B82F6;
+}
+.category-routine .habit-item.completed .habit-status-badge {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3B82F6;
+}
+
+/* Others Category styles */
+.category-section-container.category-others {
+  background: rgba(245, 158, 11, 0.02);
+  border-color: rgba(245, 158, 11, 0.15);
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.02);
+}
+[data-theme="light"] .category-section-container.category-others {
+  background: rgba(245, 158, 11, 0.04);
+}
+.dashboard-category-title.others-header {
+  color: #F59E0B;
+  border-bottom-color: rgba(245, 158, 11, 0.25);
+}
+.category-others .category-empty-placeholder { border-color: rgba(245, 158, 11, 0.15); }
+.category-others .period-list-container { border-left-color: rgba(245, 158, 11, 0.15); }
+.category-others .dashboard-period-title::before { border-color: rgba(245, 158, 11, 0.4); background: #F59E0B; }
+.category-others .time-slot-group-card { border-left: 4px solid #F59E0B; }
+.category-others .time-slot-title { color: #F59E0B; }
+.category-others .group-toggle-btn:hover {
+  background: rgba(245, 158, 11, 0.1);
+  color: #F59E0B;
+  border-color: #F59E0B;
+}
+.category-others .group-toggle-btn.all-checked {
+  background: #F59E0B;
+  color: #FFFFFF;
+  border-color: #F59E0B;
+}
+.category-others .habit-checkbox-hidden:checked~.checkbox-display {
+  background-color: #F59E0B;
+  border-color: #F59E0B;
+}
+.category-others .habit-item.completed .habit-status-badge {
+  background: rgba(245, 158, 11, 0.1);
+  color: #F59E0B;
 }

@@ -5,6 +5,14 @@
 
 const DEFAULT_HABITS_INITIAL = [];
 
+export const CATEGORIES = [
+  { id: "diet", name: "Diet", icon: "🥗", color: "#22C55E", class: "diet-header" },
+  { id: "skincare", name: "Skin Care", icon: "🧴", color: "#EC4899", class: "skincare-header" },
+  { id: "haircare", name: "Hair Care", icon: "💇", color: "#A855F7", class: "haircare-header" },
+  { id: "routine", name: "Routine", icon: "📅", color: "#3B82F6", class: "routine-header" },
+  { id: "others", name: "Others", icon: "📦", color: "#F59E0B", class: "others-header" }
+];
+
 export const DEFAULT_HABITS = [...DEFAULT_HABITS_INITIAL];
 
 // Load custom habits if present in localStorage
@@ -27,14 +35,17 @@ try {
 
 export class StorageManager {
   static STORAGE_KEY = "HabitTracker";
+  static cache = null;
 
   /**
    * Get the main HabitTracker storage object.
    */
   static getRawData() {
+    if (this.cache) return this.cache;
     try {
       const data = localStorage.getItem(this.STORAGE_KEY);
-      return data ? JSON.parse(data) : {};
+      this.cache = data ? JSON.parse(data) : {};
+      return this.cache;
     } catch (e) {
       console.error("Failed to parse HabitTracker local storage data", e);
       return {};
@@ -45,6 +56,7 @@ export class StorageManager {
    * Save the main HabitTracker storage object.
    */
   static saveRawData(data) {
+    this.cache = data;
     try {
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
     } catch (e) {
@@ -162,6 +174,28 @@ export class StorageManager {
     const totalCount = DEFAULT_HABITS.length;
     const percent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
     return { completedCount, totalCount, percent };
+  }
+
+  /**
+   * Get completion stats for a specific category on a specific date.
+   */
+  static getCategoryStats(dateStr, categoryId) {
+    const dayData = this.getDayData(dateStr) || {};
+    let completed = 0;
+    let total = 0;
+
+    DEFAULT_HABITS.forEach(habit => {
+      const cat = (habit.category || 'diet').toLowerCase();
+      if (cat === categoryId.toLowerCase()) {
+        total++;
+        if (dayData[habit.id] === true) {
+          completed++;
+        }
+      }
+    });
+
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+    return { completed, total, percentage };
   }
 
   /**

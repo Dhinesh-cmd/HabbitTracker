@@ -164,3 +164,76 @@
 
 .extreme-score.success-val { color: var(--success); }
 .extreme-score.danger-val { color: var(--danger); }
+
+/* Bottom 3-Card Grid Layout */
+.charts-grid-three {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+@media (min-width: 992px) {
+  .charts-grid-three {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Category Leaderboard & Summary Rows */
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+}
+
+.leaderboard-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.leaderboard-rank {
+  font-size: 1.1rem;
+}
+
+.leaderboard-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.leaderboard-rate {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--accent);
+}
+
+.today-breakdown-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+
+.today-breakdown-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+.today-breakdown-overall {
+  border-top: 1.5px dashed var(--border-color);
+  margin-top: 6px;
+  padding-top: 8px;
+  font-weight: 700;
+}
+

@@ -222,6 +222,23 @@
   transition: transform var(--transition-normal);
 }
 
+.history-modal-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.history-modal-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.history-modal-content::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+.history-modal-content::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
 .history-modal-backdrop.active .history-modal-content {
   transform: translateY(0);
 }
@@ -351,3 +368,24 @@
   margin-bottom: 20px;
   opacity: 0.6;
 }
+
+/* Modal Category Layout Styling */
+.modal-category-section {
+  margin-bottom: 20px;
+}
+
+.modal-category-section:last-child {
+  margin-bottom: 0;
+}
+
+.modal-category-habits {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dashboard-category-title.workout-header {
+  color: #3B82F6;
+  border-bottom-color: rgba(59, 130, 246, 0.25);
+}
+

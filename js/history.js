@@ -3,14 +3,15 @@
  * Handles logs listing, filtering, search, sorting, modal detail inspections, and day record deletions.
  */
 
-import { DEFAULT_HABITS, StorageManager } from './storage.js';
+import { DEFAULT_HABITS, StorageManager, CATEGORIES } from './storage.js';
 import { 
   getDailyQuote, 
   formatHeaderDate, 
   updateDigitalClock, 
   initTheme, 
   toggleTheme,
-  registerServiceWorker
+  registerServiceWorker,
+  showToast
 } from './utils.js';
 
 class HistoryPageController {
@@ -329,28 +330,100 @@ class HistoryPageController {
       this.dom.modalNotesWrapper.style.display = "none";
     }
 
-    // List of Habits Ticks & Misses
+    // List of Habits Ticks & Misses grouped by category
     this.dom.modalHabitsListContainer.innerHTML = "";
     
+    // Group habits by category
+    const categoryGroups = {};
     DEFAULT_HABITS.forEach(habit => {
-      const isCompleted = dayData[habit.id] === true;
-      const completeTime = dayData.__timestamps?.[habit.id] || "";
-      
-      const row = document.createElement('div');
-      row.className = "modal-habit-row";
-      row.innerHTML = `
-        <div class="modal-habit-info">
-          <span style="font-size: 1.1rem;">${isCompleted ? '🟢' : '⚫'}</span>
-          <span>${habit.name}</span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 8px;">
-          ${isCompleted && completeTime ? `<span class="habit-time-stamp">${completeTime}</span>` : ''}
-          <span class="modal-habit-status ${isCompleted ? 'done' : 'miss'}">
-            ${isCompleted ? '✓ Done' : '✕ Missed'}
-          </span>
-        </div>
-      `;
-      this.dom.modalHabitsListContainer.appendChild(row);
+      const cat = (habit.category || 'diet').toLowerCase();
+      if (!categoryGroups[cat]) {
+        categoryGroups[cat] = [];
+      }
+      categoryGroups[cat].push(habit);
+    });
+
+    const categoryMetadata = {};
+    CATEGORIES.forEach(c => {
+      categoryMetadata[c.id] = { label: `${c.icon} ${c.name}`, class: c.class };
+    });
+
+    const getCategoryMeta = (cat) => {
+      if (categoryMetadata[cat]) {
+        return categoryMetadata[cat];
+      }
+      const displayName = cat.split(/[\s-_]+/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+      return {
+        label: `📋 ${displayName}`,
+        class: 'diet-header'
+      };
+    };
+
+    // Sort categories using the config order
+    const categoryOrder = CATEGORIES.map(c => c.id);
+    const activeCategories = Object.keys(categoryGroups).sort((a, b) => {
+      const indexA = categoryOrder.indexOf(a);
+      const indexB = categoryOrder.indexOf(b);
+      if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+      if (indexA !== -1) return -1;
+      if (indexB !== -1) return 1;
+      return a.localeCompare(b);
+    });
+
+    activeCategories.forEach(cat => {
+      const habits = categoryGroups[cat];
+      const meta = getCategoryMeta(cat);
+
+      // Category section container
+      const section = document.createElement('div');
+      section.className = 'modal-category-section';
+
+      // Category Title / Header
+      const header = document.createElement('h4');
+      header.className = `dashboard-category-title ${meta.class}`;
+      header.style.fontSize = '1rem';
+      header.style.marginBottom = '12px';
+      header.style.paddingBottom = '6px';
+      header.textContent = meta.label;
+      section.appendChild(header);
+
+      // Category habits list container
+      const listContainer = document.createElement('div');
+      listContainer.className = 'modal-category-habits';
+
+      if (habits.length === 0) {
+        const emptyRow = document.createElement('div');
+        emptyRow.className = "modal-habit-row";
+        emptyRow.style.justifyContent = 'center';
+        emptyRow.style.color = 'var(--text-secondary)';
+        emptyRow.style.fontStyle = 'italic';
+        emptyRow.textContent = "No habits logged";
+        listContainer.appendChild(emptyRow);
+      } else {
+        habits.forEach(habit => {
+          const isCompleted = dayData[habit.id] === true;
+          const completeTime = dayData.__timestamps?.[habit.id] || "";
+          
+          const row = document.createElement('div');
+          row.className = "modal-habit-row";
+          row.innerHTML = `
+            <div class="modal-habit-info">
+              <span style="font-size: 1.1rem;">${isCompleted ? '🟢' : '⚫'}</span>
+              <span>${habit.name}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              ${isCompleted && completeTime ? `<span class="habit-time-stamp">${completeTime}</span>` : ''}
+              <span class="modal-habit-status ${isCompleted ? 'done' : 'miss'}">
+                ${isCompleted ? '✓ Done' : '✕ Missed'}
+              </span>
+            </div>
+          `;
+          listContainer.appendChild(row);
+        });
+      }
+
+      section.appendChild(listContainer);
+      this.dom.modalHabitsListContainer.appendChild(section);
     });
 
     // Display modal
@@ -377,30 +450,12 @@ class HistoryPageController {
   }
 
   showLocalToast(title, message, type = "info") {
-    const toast = document.createElement('div');
-    toast.className = "notification-toast";
-    
-    let emoji = "ℹ️";
-    if (type === "warning") emoji = "⚠️";
-    else if (type === "success") emoji = "✅";
-
-    toast.innerHTML = `
-      <div class="notification-header">
-        <span>${emoji}</span>
-        <span class="notification-title">${title}</span>
-      </div>
-      <div class="notification-body">${message}</div>
-    `;
-
-    this.dom.notificationContainer.appendChild(toast);
-    setTimeout(() => {
-      toast.classList.add('dismissing');
-      setTimeout(() => {
-        if (toast.parentNode) {
-          this.dom.notificationContainer.removeChild(toast);
-        }
-      }, 300);
-    }, 3500);
+    showToast({
+      title,
+      message,
+      type,
+      duration: 3000
+    });
   }
 
   setupPageTransitions() {
@@ -409,7 +464,7 @@ class HistoryPageController {
       if (this.dom.loadingOverlay) {
         this.dom.loadingOverlay.classList.add('fade-out');
       }
-    }, 300);
+    }, 50);
 
     const navLinks = document.querySelectorAll('.bottom-nav-item, .nav-links a, .nav-brand');
     navLinks.forEach(link => {
@@ -430,7 +485,7 @@ class HistoryPageController {
         
         setTimeout(() => {
           window.location.href = href;
-        }, 150);
+        }, 50);
       });
     });
   }
