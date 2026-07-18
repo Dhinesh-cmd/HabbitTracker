@@ -25,6 +25,7 @@ const ASSETS_TO_CACHE = [
 
 // Install Event - Caching Assets
 self.addEventListener("install", (e) => {
+  console.log("[SW] Installed");
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       console.log("[Service Worker] Caching files for offline accessibility.");
@@ -36,6 +37,7 @@ self.addEventListener("install", (e) => {
 
 // Activate Event - Cleaning Up Old Caches
 self.addEventListener("activate", (e) => {
+  console.log("[SW] Activated");
   e.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
@@ -80,4 +82,58 @@ self.addEventListener("fetch", (e) => {
         });
       })
   );
+});
+
+// Background Push Event
+self.addEventListener("push", (e) => {
+  console.log("[SW] Push Received");
+  let data = { title: "My Habit Tracker", body: "Reminder Alert!" };
+  if (e.data) {
+    try {
+      data = e.data.json();
+    } catch (err) {
+      data = { title: "My Habit Tracker", body: e.data.text() };
+    }
+  }
+
+  const options = {
+    body: data.body,
+    icon: "assets/icons/icon-192.png",
+    badge: "assets/icons/icon-192.png",
+    vibrate: [100, 50, 100],
+    data: {
+      dateOfArrival: Date.now(),
+      primaryKey: 1
+    }
+  };
+
+  e.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+
+// Notification Click Event
+self.addEventListener("notificationclick", (e) => {
+  console.log("[SW] Notification Clicked");
+  e.notification.close();
+
+  e.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      // Focus if window already exists
+      for (const client of clientList) {
+        if (client.url.includes(self.location.origin) && "focus" in client) {
+          return client.focus();
+        }
+      }
+      // Or open a new tab/window
+      if (self.clients.openWindow) {
+        return self.clients.openWindow("./index.html");
+      }
+    })
+  );
+});
+
+// Notification Close Event
+self.addEventListener("notificationclose", (e) => {
+  console.log("[SW] Notification Closed");
 });

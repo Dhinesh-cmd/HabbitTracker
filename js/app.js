@@ -14,8 +14,11 @@ import {
   initTheme, 
   toggleTheme,
   registerServiceWorker,
-  showToast
+  showToast,
+  CustomDialog
 } from './utils.js';
+import { PushService } from './push-service.js';
+
 
 class HabitTrackerApp {
   constructor() {
@@ -23,13 +26,45 @@ class HabitTrackerApp {
     this.todayStr = StorageManager.formatDate(this.currentDate);
     this.snoozedHabits = {}; // id -> timestamp to remind again
     this.notifiedHabits = new Set(); // ids notified today to prevent repeat spam
-    this.notifiedGroups10Min = new Set(); // time groups warned today
 
     // Initialize theme and storage
+    console.group("%c🚀 App Started", "color: #10b981; font-weight: bold;");
+    console.info("Main Habit Tracker PWA application started.");
+    console.groupEnd();
+
     initTheme();
     registerServiceWorker();
     StorageManager.runAutoCleanup();
     StorageManager.initToday(this.todayStr);
+
+    // Initialize Firebase Push Notification Service
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready.then(async (registration) => {
+        try {
+          const { NotificationService } = await import('./notification-service.js');
+          await NotificationService.init(registration, DEFAULT_HABITS);
+        } catch (e) {
+          console.error("FCM service initialization failed:", e);
+        }
+      });
+
+      // Listen for message broadcasts from the service worker (e.g. Mark Done / Snooze background actions)
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        const data = event.data;
+        if (!data) return;
+
+        if (data.type === "HABITS_COMPLETED") {
+          data.habits.forEach(habit => {
+            StorageManager.setHabitStatus(data.date, habit.id, true);
+          });
+          playSuccessChime();
+          this.updateDashboardProgress();
+          this.renderChecklist();
+        } else if (data.type === "HABIT_SNOOZED") {
+          this.snoozedHabits[data.habitId] = data.snoozedUntilMs;
+        }
+      });
+    }
 
 
 
@@ -184,7 +219,15 @@ class HabitTrackerApp {
   setupEventListeners() {
     // Theme Toggle
     this.dom.themeToggleBtn.addEventListener('click', () => {
-      toggleTheme();
+      console.group("%c🌗 Theme Changed", "color: #a855f7; font-weight: bold;");
+      try {
+        const newTheme = toggleTheme();
+        console.info(`Theme toggled. New mode is: ${newTheme}`);
+      } catch (err) {
+        console.error("Theme toggle failed:", err);
+      } finally {
+        console.groupEnd();
+      }
     });
 
     // Notes auto-save on typing
@@ -944,7 +987,16 @@ class HabitTrackerApp {
   }
 
   handleHabitToggle(habitId, completed, habitRowEl, updateProgressImmediately = true) {
-    StorageManager.setHabitStatus(this.todayStr, habitId, completed);
+    console.group(`%c✔ Habit ${completed ? 'Completed' : 'Uncompleted'}`, "color: #3b82f6; font-weight: bold;");
+    try {
+      StorageManager.setHabitStatus(this.todayStr, habitId, completed);
+      PushService.syncCompletionStatus(this.todayStr, habitId, completed);
+      console.info(`Habit ID: "${habitId}", Completed: ${completed}`);
+    } catch (e) {
+      console.error("Failed to toggle habit completion:", e);
+    } finally {
+      console.groupEnd();
+    }
     
     // Audio feedback on checking (Web Audio oscillator)
     if (completed && updateProgressImmediately) {
@@ -1369,106 +1421,13 @@ class HabitTrackerApp {
           }
         }
       }
-
-      // 3. WhatsApp 10-Minute Meal Warnings (Legacy)
-      const waEnabled = rawSettings.whatsappEnabled === true;
-      const waPhone = rawSettings.whatsappPhone || "";
-
-      if (waEnabled && waPhone) {
-        const groupedByTime = {};
-        DEFAULT_HABITS.forEach(h => {
-          if (!groupedByTime[h.time]) groupedByTime[h.time] = [];
-          groupedByTime[h.time].push(h);
-        });
-
-        Object.keys(groupedByTime).forEach(timeSlot => {
-          const habits = groupedByTime[timeSlot];
-          const cleanTime = timeSlot.split('–')[0].trim();
-          const scheduledMinutes = this.getMinutesFromTimeString(cleanTime);
-          
-          if (scheduledMinutes === null) return;
-
-          const triggerMinutes = scheduledMinutes - 10;
-
-          if (currentMinutes === triggerMinutes) {
-            const pending = habits.filter(h => dayData[h.id] !== true);
-
-            if (pending.length > 0 && !this.notifiedGroups10Min.has(timeSlot)) {
-              this.show10MinWarningNotification(timeSlot, pending, waPhone);
-              this.notifiedGroups10Min.add(timeSlot);
-            }
-          }
-        });
       }
-    };
 
     // Run check immediately and check every 30 seconds
     checkScheduleTimes();
     setInterval(checkScheduleTimes, 30000);
   }
 
-  show10MinWarningNotification(timeSlot, pendingHabits, phone) {
-    playNotificationSound();
-
-    const timeSlotClean = timeSlot.replace(/[^a-zA-Z0-9]/g, '');
-    const waMsg = `🔔 *Meal Reminder (10m Warning)*: In 10 minutes, it is time to:\n${pendingHabits.map(h => `- ${h.name}`).join('\n')}\n\nConsistency builds results! 💪`;
-    const waUrl = `https://wa.me/${phone.replace(/\+/g, '')}?text=${encodeURIComponent(waMsg)}`;
-
-    const bodyHtml = `
-      In 10 minutes (at <strong>${timeSlot}</strong>), it is time to:
-      <ul style="margin: 6px 0 0 16px; padding: 0; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.4;">
-        ${pendingHabits.map(h => `<li>${h.name}</li>`).join('')}
-      </ul>
-    `;
-
-    showToast({
-      title: "Meal Warning (10m)",
-      bodyHtml: bodyHtml,
-      type: "bell",
-      duration: 3000,
-      actions: [
-        {
-          text: "Dismiss",
-          className: "dismiss",
-          id: `wa-dismiss-${timeSlotClean}`,
-          onClick: (e, dismiss) => {
-            dismiss();
-          }
-        },
-        {
-          text: "Mark Done",
-          className: "complete",
-          id: `wa-complete-${timeSlotClean}`,
-          style: { background: "var(--accent)", color: "#fff" },
-          onClick: (e, dismiss) => {
-            pendingHabits.forEach(h => {
-              const row = this.dom.timelineSchedule.querySelector(`[data-id="${h.id}"]`);
-              if (row) {
-                const checkbox = row.querySelector('.habit-checkbox-hidden');
-                checkbox.checked = true;
-                this.handleHabitToggle(h.id, true, row, false);
-              } else {
-                StorageManager.setHabitStatus(this.todayStr, h.id, true);
-              }
-            });
-            playSuccessChime();
-            this.updateDashboardProgress();
-            dismiss();
-          }
-        },
-        {
-          text: "📲 Send WhatsApp",
-          className: "complete",
-          id: `wa-send-${timeSlotClean}`,
-          style: { background: "var(--success)", color: "#fff", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px", fontWeight: "600" },
-          onClick: (e, dismiss) => {
-            window.open(waUrl, '_blank');
-            this.showLocalNotification("WhatsApp Alert", "Redirected to WhatsApp message dispatch.", "success");
-          }
-        }
-      ]
-    });
-  }
 
   showHabitReminderNotification(habit) {
     playNotificationSound();
@@ -1708,60 +1667,78 @@ class HabitTrackerApp {
     let updatedHabits;
 
     if (this.editingTimeSlot === null) {
-      const habitsToAppend = this.editorHabitList.map(item => {
-        const id = `${newTimeSlot}|${item.name}`;
-        return {
-          id,
-          time: newTimeSlot,
-          name: item.name,
-          category
-        };
-      });
-      updatedHabits = [...DEFAULT_HABITS, ...habitsToAppend];
-      StorageManager.saveHabits(updatedHabits);
+      console.group("%c➕ Habit Created", "color: #10b981; font-weight: bold;");
+      try {
+        const habitsToAppend = this.editorHabitList.map(item => {
+          const id = `${newTimeSlot}|${item.name}`;
+          return {
+            id,
+            time: newTimeSlot,
+            name: item.name,
+            category
+          };
+        });
+        updatedHabits = [...DEFAULT_HABITS, ...habitsToAppend];
+        StorageManager.saveHabits(updatedHabits);
+        PushService.syncAllHabits(updatedHabits);
+        console.info("New habits added to schedule:", habitsToAppend);
+      } catch (err) {
+        console.error("Failed to save new habit:", err);
+      } finally {
+        console.groupEnd();
+      }
     } else {
-      const otherHabits = DEFAULT_HABITS.filter(h => !(h.time === this.editingTimeSlot && h.category === this.editingCategory));
-      
-      const updatedGroupHabits = this.editorHabitList.map(item => {
-        const id = item.id || `${newTimeSlot}|${item.name}`;
-        return {
-          id,
-          time: newTimeSlot,
-          name: item.name,
-          category
-        };
-      });
+      console.group("%c✏️ Habit Updated", "color: #3b82f6; font-weight: bold;");
+      try {
+        const otherHabits = DEFAULT_HABITS.filter(h => !(h.time === this.editingTimeSlot && h.category === this.editingCategory));
+        
+        const updatedGroupHabits = this.editorHabitList.map(item => {
+          const id = item.id || `${newTimeSlot}|${item.name}`;
+          return {
+            id,
+            time: newTimeSlot,
+            name: item.name,
+            category
+          };
+        });
 
-      const todayStr = this.todayStr;
-      const rawData = StorageManager.getRawData();
-      const dayData = rawData[todayStr];
-      const migrationMap = {};
-      
-      const oldGroupHabits = DEFAULT_HABITS.filter(h => h.time === this.editingTimeSlot && h.category === this.editingCategory);
-      oldGroupHabits.forEach((oldHabit, idx) => {
-        const newHabit = updatedGroupHabits[idx];
-        if (newHabit && oldHabit.id !== newHabit.id) {
-          migrationMap[oldHabit.id] = newHabit.id;
-        }
-      });
-
-      if (dayData) {
-        Object.keys(migrationMap).forEach(oldId => {
-          const newId = migrationMap[oldId];
-          if (dayData[oldId] !== undefined) {
-            dayData[newId] = dayData[oldId];
-            delete dayData[oldId];
-          }
-          if (dayData.__timestamps && dayData.__timestamps[oldId] !== undefined) {
-            dayData.__timestamps[newId] = dayData.__timestamps[oldId];
-            delete dayData.__timestamps[oldId];
+        const todayStr = this.todayStr;
+        const rawData = StorageManager.getRawData();
+        const dayData = rawData[todayStr];
+        const migrationMap = {};
+        
+        const oldGroupHabits = DEFAULT_HABITS.filter(h => h.time === this.editingTimeSlot && h.category === this.editingCategory);
+        oldGroupHabits.forEach((oldHabit, idx) => {
+          const newHabit = updatedGroupHabits[idx];
+          if (newHabit && oldHabit.id !== newHabit.id) {
+            migrationMap[oldHabit.id] = newHabit.id;
           }
         });
-        StorageManager.saveRawData(rawData);
-      }
 
-      updatedHabits = [...otherHabits, ...updatedGroupHabits];
-      StorageManager.saveHabits(updatedHabits);
+        if (dayData) {
+          Object.keys(migrationMap).forEach(oldId => {
+            const newId = migrationMap[oldId];
+            if (dayData[oldId] !== undefined) {
+              dayData[newId] = dayData[oldId];
+              delete dayData[oldId];
+            }
+            if (dayData.__timestamps && dayData.__timestamps[oldId] !== undefined) {
+              dayData.__timestamps[newId] = dayData.__timestamps[oldId];
+              delete dayData.__timestamps[oldId];
+            }
+          });
+          StorageManager.saveRawData(rawData);
+        }
+
+        updatedHabits = [...otherHabits, ...updatedGroupHabits];
+        StorageManager.saveHabits(updatedHabits);
+        PushService.syncAllHabits(updatedHabits);
+        console.info("Habits updated successfully:", updatedGroupHabits);
+      } catch (err) {
+        console.error("Failed to update habits:", err);
+      } finally {
+        console.groupEnd();
+      }
     }
 
     if (this.dom.loadingOverlay) {
@@ -1780,19 +1757,33 @@ class HabitTrackerApp {
     }, 300);
   }
 
-  deleteScheduleGroup() {
+  async deleteScheduleGroup() {
     if (!this.editingTimeSlot) return;
 
-    if (!confirm(`Are you sure you want to delete this routine group?`)) {
+    const confirmed = await CustomDialog.confirm("Delete Routine", `Are you sure you want to delete this routine group?`, true);
+    if (!confirmed) {
       return;
     }
 
-    if (this.dom.loadingOverlay) {
-      this.dom.loadingOverlay.classList.remove('fade-out');
-    }
+    console.group("%c🗑️ Habit Deleted", "color: #ef4444; font-weight: bold;");
+    try {
+      if (this.dom.loadingOverlay) {
+        this.dom.loadingOverlay.classList.remove('fade-out');
+      }
 
-    const updatedHabits = DEFAULT_HABITS.filter(h => !(h.time === this.editingTimeSlot && h.category === this.editingCategory));
-    StorageManager.saveHabits(updatedHabits);
+      const updatedHabits = DEFAULT_HABITS.filter(h => !(h.time === this.editingTimeSlot && h.category === this.editingCategory));
+      StorageManager.saveHabits(updatedHabits);
+      PushService.syncAllHabits(updatedHabits);
+
+      // Explicitly delete removed habits from Firestore
+      const deletedHabits = DEFAULT_HABITS.filter(h => h.time === this.editingTimeSlot && h.category === this.editingCategory);
+      deletedHabits.forEach(h => PushService.deleteHabit(h.id));
+      console.info("Routine group deleted:", deletedHabits);
+    } catch (err) {
+      console.error("Failed to delete habits:", err);
+    } finally {
+      console.groupEnd();
+    }
 
     setTimeout(() => {
       this.dom.scheduleModal.classList.remove('active');

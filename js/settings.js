@@ -13,8 +13,10 @@ import {
   downloadCSVReport,
   exportPDFReport,
   registerServiceWorker,
-  showToast
+  showToast,
+  CustomDialog
 } from './utils.js';
+import { NotificationManager } from './notification-manager.js';
 
 class SettingsPageController {
   constructor() {
@@ -37,10 +39,9 @@ class SettingsPageController {
       sleepTimeInput: document.getElementById('sleepTimeInput'),
       soundsToggleInput: document.getElementById('soundsToggleInput'),
       themeToggleSwitch: document.getElementById('themeToggleSwitch'),
-      whatsappToggleInput: document.getElementById('whatsappToggleInput'),
-      whatsappConfigRow: document.getElementById('whatsappConfigRow'),
-      whatsappPhoneInput: document.getElementById('whatsappPhoneInput'),
-      testWhatsappBtn: document.getElementById('testWhatsappBtn'),
+      pushToggleInput: document.getElementById('pushToggleInput'),
+      testNotificationRow: document.getElementById('testNotificationRow'),
+      testNotificationBtn: document.getElementById('testNotificationBtn'),
 
       // JSON backups
       importJsonFileInput: document.getElementById('importJsonFileInput'),
@@ -67,6 +68,10 @@ class SettingsPageController {
   }
 
   init() {
+    console.group("%c🚀 App Started", "color: #10b981; font-weight: bold;");
+    console.info("Settings Controller initialized successfully.");
+    console.groupEnd();
+
     // Setup clock and dates
     updateDigitalClock('navClockDisplay');
     this.dom.currentDayDate.textContent = formatHeaderDate(this.currentDate);
@@ -81,8 +86,17 @@ class SettingsPageController {
   }
 
   loadSavedPreferences() {
+    console.group("%c⚙️ Settings Loaded", "color: #6366f1; font-weight: bold;");
     const rawData = StorageManager.getRawData();
+    console.log("LocalStorage Loaded successfully:", rawData);
     const settings = rawData.settings || {};
+
+    // Clean up unused legacy WhatsApp keys
+    if (settings.whatsappEnabled !== undefined || settings.whatsappPhone !== undefined) {
+      delete settings.whatsappEnabled;
+      delete settings.whatsappPhone;
+      StorageManager.saveRawData(rawData);
+    }
 
     // Name (default "Dhinesh")
     let userName = "Dhinesh";
@@ -112,25 +126,53 @@ class SettingsPageController {
     const currentTheme = document.documentElement.getAttribute("data-theme") || "dark";
     this.dom.themeToggleSwitch.checked = currentTheme === "dark";
 
-    // WhatsApp
-    const waEnabled = settings.whatsappEnabled === true;
-    this.dom.whatsappToggleInput.checked = waEnabled;
-    this.dom.whatsappPhoneInput.value = settings.whatsappPhone || "";
-    this.dom.whatsappConfigRow.style.display = waEnabled ? "flex" : "none";
+    // Push Notifications
+    const pushEnabled = settings.pushNotificationsEnabled === true;
+    console.log("Loaded Push Settings: " + pushEnabled);
+    this.dom.pushToggleInput.checked = pushEnabled;
+    
+    // Validate current notification permission and align UI
+    if (pushEnabled && "Notification" in window && Notification.permission === "granted") {
+      this.dom.testNotificationRow.style.display = "flex";
+    } else {
+      this.dom.testNotificationRow.style.display = "none";
+      if (pushEnabled) {
+        // If saved as active but permission is revoked, sync settings
+        this.dom.pushToggleInput.checked = false;
+        this.saveSettingKey("pushNotificationsEnabled", false);
+      }
+    }
+    console.groupEnd();
   }
 
 
   setupEventListeners() {
     // Top Nav Theme Toggle
     this.dom.themeToggleBtn.addEventListener('click', () => {
-      const newTheme = toggleTheme();
-      this.dom.themeToggleSwitch.checked = newTheme === "dark";
+      console.group("%c🌗 Theme Changed", "color: #a855f7; font-weight: bold;");
+      try {
+        const newTheme = toggleTheme();
+        this.dom.themeToggleSwitch.checked = newTheme === "dark";
+        console.info(`Theme toggled via Top Nav. New mode is: ${newTheme}`);
+      } catch (err) {
+        console.error("Theme toggle failed:", err);
+      } finally {
+        console.groupEnd();
+      }
     });
 
     // Settings Card Theme Switch
     this.dom.themeToggleSwitch.addEventListener('change', () => {
-      const newTheme = toggleTheme();
-      this.showLocalToast("Theme Synced", `Workspace toggled to ${newTheme} mode.`, "success");
+      console.group("%c🌗 Theme Changed", "color: #a855f7; font-weight: bold;");
+      try {
+        const newTheme = toggleTheme();
+        this.showLocalToast("Theme Synced", `Workspace toggled to ${newTheme} mode.`, "success");
+        console.info(`Theme toggled via Settings Card. New mode is: ${newTheme}`);
+      } catch (err) {
+        console.error("Theme toggle failed:", err);
+      } finally {
+        console.groupEnd();
+      }
     });
 
     // Username config save on change
@@ -170,89 +212,128 @@ class SettingsPageController {
       this.showLocalToast("Audio Updated", `Reminders sound cues: ${e.target.checked ? 'Enabled' : 'Muted'}.`, "success");
     });
 
-    // WhatsApp Reminder toggle change
-    this.dom.whatsappToggleInput.addEventListener('change', (e) => {
-      const waEnabled = e.target.checked;
-      this.saveSettingKey("whatsappEnabled", waEnabled);
-      this.dom.whatsappConfigRow.style.display = waEnabled ? "flex" : "none";
-      this.showLocalToast("WhatsApp Reminders", `WhatsApp meal warnings ${waEnabled ? 'Enabled' : 'Disabled'}.`, "success");
-    });
+    // Push Notification toggle change
+    this.dom.pushToggleInput.addEventListener('change', async (e) => {
+      const isChecked = e.target.checked;
+      
+      if (isChecked) {
+        if (!("Notification" in window)) {
+          this.showLocalToast("Not Supported", "Push notifications are not supported by this browser.", "warning");
+          this.dom.pushToggleInput.checked = false;
+          return;
+        }
 
-    // WhatsApp Phone number validation & save
-    this.dom.whatsappPhoneInput.addEventListener('input', (e) => {
-      const phoneVal = e.target.value.trim();
-      const phoneRegex = /^\+?[1-9]\d{9,14}$/;
-
-      if (phoneVal === "") {
-        this.dom.whatsappPhoneInput.style.borderColor = "var(--border-color)";
-        this.saveSettingKey("whatsappPhone", "");
-        return;
-      }
-
-      if (phoneRegex.test(phoneVal)) {
-        this.dom.whatsappPhoneInput.style.borderColor = "var(--success)";
-        this.saveSettingKey("whatsappPhone", phoneVal);
+        try {
+          const permission = await Notification.requestPermission();
+          if (permission === "granted") {
+            this.saveSettingKey("pushNotificationsEnabled", true);
+            this.dom.testNotificationRow.style.display = "flex";
+            this.showLocalToast("Notifications Enabled", "You will now receive habit reminder notifications.", "success");
+            // Run audit / smoke test immediately
+            await NotificationManager.runSmokeTest();
+          } else {
+            this.dom.pushToggleInput.checked = false;
+            this.saveSettingKey("pushNotificationsEnabled", false);
+            this.dom.testNotificationRow.style.display = "none";
+            this.showLocalToast("Permission Denied", "Notification permission denied.", "warning");
+          }
+        } catch (err) {
+          console.error("Error requesting notification permission:", err);
+          this.dom.pushToggleInput.checked = false;
+          this.saveSettingKey("pushNotificationsEnabled", false);
+          this.dom.testNotificationRow.style.display = "none";
+        }
       } else {
-        this.dom.whatsappPhoneInput.style.borderColor = "var(--danger)";
+        this.saveSettingKey("pushNotificationsEnabled", false);
+        this.dom.testNotificationRow.style.display = "none";
+        this.showLocalToast("Notifications Disabled", "Push notifications have been disabled.", "info");
       }
     });
 
-    // WhatsApp Test message trigger
-    this.dom.testWhatsappBtn.addEventListener('click', () => {
-      const rawData = StorageManager.getRawData();
-      const phoneNum = rawData.settings?.whatsappPhone || "";
+    // Test Notification button logic
+    this.dom.testNotificationBtn.addEventListener('click', () => {
+      if (this.dom.testNotificationBtn.disabled) return;
+      
+      this.dom.testNotificationBtn.disabled = true;
+      this.showLocalToast("Test Started", "Scheduling 5 test notifications (30s intervals).", "success");
 
-      if (!phoneNum) {
-        this.showLocalToast("Validation Error", "Please enter a valid phone number with country code first.", "warning");
-        this.dom.whatsappPhoneInput.style.borderColor = "var(--danger)";
-        this.dom.whatsappPhoneInput.focus();
-        return;
-      }
-
-      const text = "🔔 *Habit Tracker test message*: Your WhatsApp notification reminders are configured successfully! Get ready for consistency. 💪";
-      const url = `https://wa.me/${phoneNum.replace(/\+/g, '')}?text=${encodeURIComponent(text)}`;
-      window.open(url, "_blank");
-      this.showLocalToast("Test Dispatched", "Opened WhatsApp Click-to-Chat in a new tab.", "success");
+      NotificationManager.scheduleTestSequence(() => {
+        this.dom.testNotificationBtn.disabled = false;
+        this.showLocalToast("Test Completed", "Test notification completed.", "success");
+      });
     });
 
     // Reset Today Checklist trigger
     this.dom.resetTodayBtn.addEventListener('click', () => {
-      if (this.dom.loadingOverlay) {
-        this.dom.loadingOverlay.classList.remove('fade-out');
-      }
-      StorageManager.resetToday();
-      playSuccessChime();
-      setTimeout(() => {
-        this.showLocalToast("Today Reset", "Today's checklist and sliders have been cleared.", "success");
+      console.group("%c🧹 Today's Data Reset", "color: #eab308; font-weight: bold;");
+      try {
         if (this.dom.loadingOverlay) {
-          this.dom.loadingOverlay.classList.add('fade-out');
+          this.dom.loadingOverlay.classList.remove('fade-out');
         }
-      }, 300);
-    });
-
-
-    // Wipe Database Confirm Modal Trigger
-    this.dom.clearAllHistoryBtn.addEventListener('click', () => {
-      this.dom.wipeDatabaseConfirmModal.classList.add('active');
-    });
-
-    this.dom.cancelWipeBtn.addEventListener('click', () => {
-      this.dom.wipeDatabaseConfirmModal.classList.remove('active');
-    });
-
-    this.dom.confirmWipeBtn.addEventListener('click', () => {
-      if (this.dom.loadingOverlay) {
-        this.dom.loadingOverlay.classList.remove('fade-out');
+        StorageManager.resetToday();
+        playSuccessChime();
+        console.log("Today's checklist data has been reset to defaults.");
+        setTimeout(() => {
+          this.showLocalToast("Today Reset", "Today's checklist and sliders have been cleared.", "success");
+          if (this.dom.loadingOverlay) {
+            this.dom.loadingOverlay.classList.add('fade-out');
+          }
+        }, 300);
+      } catch (err) {
+        console.error("Failed to reset today's data:", err);
+      } finally {
+        console.groupEnd();
       }
-      StorageManager.clearEntireHistory();
-      this.dom.wipeDatabaseConfirmModal.classList.remove('active');
-      setTimeout(() => {
-        this.showLocalToast("Wiped Clean", "All historical habit logs have been permanently erased.", "warning");
-        this.loadSavedPreferences();
+    });
+
+
+    // Wipe Database Trigger (Using custom modern dialog)
+    this.dom.clearAllHistoryBtn.addEventListener('click', async () => {
+      const confirmed = await CustomDialog.confirm("Wipe Database", "Are you sure you want to permanently clear all tracking history, streaks, and analytics? This will preserve your profile, routines, and app settings. This cannot be undone.", true);
+      
+      if (!confirmed) {
+        console.log("Database wipe cancelled by user.");
+        return;
+      }
+
+      console.group("%c🔥 Database Wiped", "color: #ef4444; font-weight: bold;");
+      try {
         if (this.dom.loadingOverlay) {
-          this.dom.loadingOverlay.classList.add('fade-out');
+          this.dom.loadingOverlay.classList.remove('fade-out');
         }
-      }, 400);
+
+        // 1. Get raw HabitTracker data and keep only settings object
+        const rawData = StorageManager.getRawData();
+        const settings = rawData.settings || {};
+        const cleanedData = {
+          settings: settings
+        };
+        StorageManager.saveRawData(cleanedData);
+        console.log("Date-based completion and tracker logs removed. Settings preserved.");
+
+        // 2. Clear notified slots logs from local storage to allow fresh reminders
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith("notified_slots_")) {
+            localStorage.removeItem(key);
+            console.log(`Removed notified slot log: ${key}`);
+          }
+        });
+
+        // note: dailyHabits (routines configuration) and habitTrackerUser (profile) are left intact in localStorage!
+
+        this.showLocalToast("Wiped Clean", "All tracking logs and history have been cleared. Routines and settings preserved.", "warning");
+        console.info("Database wipe completed successfully. Reloading...");
+
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+
+      } catch (error) {
+        console.error("Error during database wipe execution:", error);
+        this.showLocalToast("Wipe Failed", "An error occurred during database wipe.", "danger");
+      } finally {
+        console.groupEnd();
+      }
     });
 
     // Export JSON
@@ -316,39 +397,55 @@ class SettingsPageController {
     }
 
     this.dom.exportCsvBtn.addEventListener('click', () => {
+      console.group("%c📊 CSV Generated", "color: #10b981; font-weight: bold;");
       const selectedMonth = this.dom.reportMonthInput ? this.dom.reportMonthInput.value : "";
       if (this.dom.loadingOverlay) {
         this.dom.loadingOverlay.classList.remove('fade-out');
       }
       setTimeout(() => {
-        const data = StorageManager.getRawData();
-        const historyOnly = {};
-        Object.keys(data).forEach(k => {
-          if (/^\d{4}-\d{2}-\d{2}$/.test(k)) {
-            if (selectedMonth && !k.startsWith(selectedMonth)) {
-              return;
+        try {
+          const data = StorageManager.getRawData();
+          const historyOnly = {};
+          Object.keys(data).forEach(k => {
+            if (/^\d{4}-\d{2}-\d{2}$/.test(k)) {
+              if (selectedMonth && !k.startsWith(selectedMonth)) {
+                return;
+              }
+              historyOnly[k] = data[k];
             }
-            historyOnly[k] = data[k];
+          });
+          downloadCSVReport(historyOnly, selectedMonth);
+          console.info(`CSV report successfully generated for month: ${selectedMonth || 'All'}`);
+          this.showLocalToast("CSV Generated", "Spreadsheet report download started.", "success");
+        } catch (err) {
+          console.error("CSV generation failed:", err);
+        } finally {
+          if (this.dom.loadingOverlay) {
+            this.dom.loadingOverlay.classList.add('fade-out');
           }
-        });
-        downloadCSVReport(historyOnly, selectedMonth);
-        this.showLocalToast("CSV Generated", "Spreadsheet report download started.", "success");
-        if (this.dom.loadingOverlay) {
-          this.dom.loadingOverlay.classList.add('fade-out');
+          console.groupEnd();
         }
       }, 300);
     });
 
     // Export PDF Print View
     this.dom.exportPdfBtn.addEventListener('click', () => {
+      console.group("%c📄 PDF Generated", "color: #3b82f6; font-weight: bold;");
       const selectedMonth = this.dom.reportMonthInput ? this.dom.reportMonthInput.value : "";
       if (this.dom.loadingOverlay) {
         this.dom.loadingOverlay.classList.remove('fade-out');
       }
       setTimeout(() => {
-        exportPDFReport(selectedMonth);
-        if (this.dom.loadingOverlay) {
-          this.dom.loadingOverlay.classList.add('fade-out');
+        try {
+          exportPDFReport(selectedMonth);
+          console.info(`PDF report successfully generated for month: ${selectedMonth || 'All'}`);
+        } catch (err) {
+          console.error("PDF generation failed:", err);
+        } finally {
+          if (this.dom.loadingOverlay) {
+            this.dom.loadingOverlay.classList.add('fade-out');
+          }
+          console.groupEnd();
         }
       }, 500);
     });
@@ -363,10 +460,22 @@ class SettingsPageController {
   }
 
   saveSettingKey(key, value) {
-    const raw = StorageManager.getRawData();
-    if (!raw.settings) raw.settings = {};
-    raw.settings[key] = value;
-    StorageManager.saveRawData(raw);
+    console.group("%c⚙️ Settings Saved", "color: #3b82f6; font-weight: bold;");
+    try {
+      const raw = StorageManager.getRawData();
+      if (!raw.settings) raw.settings = {};
+      raw.settings[key] = value;
+      StorageManager.saveRawData(raw);
+      if (key === "pushNotificationsEnabled") {
+        console.log("Saved Push Settings: " + value);
+      }
+      console.log(`Setting key "${key}" saved with value:`, value);
+      console.info("LocalStorage Saved successfully.");
+    } catch (e) {
+      console.error("Failed to save setting key:", e);
+    } finally {
+      console.groupEnd();
+    }
   }
 
   showLocalToast(title, message, type = "info") {

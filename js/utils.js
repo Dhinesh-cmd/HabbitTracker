@@ -263,7 +263,7 @@ export function exportPDFReport(selectedMonth) {
   const monthNameStr = monthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   
   if (monthlyKeys.length === 0) {
-    alert(`No habit data found for the selected month: ${monthNameStr}`);
+    CustomDialog.alert("Data Export", `No habit data found for the selected month: ${monthNameStr}`);
     return;
   }
   
@@ -1102,9 +1102,25 @@ export function exportPDFReport(selectedMonth) {
 export function registerServiceWorker() {
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
+      console.group("%c⚙️ Service Worker", "color: #10b981; font-weight: bold;");
       navigator.serviceWorker.register("./sw.js")
-        .then(reg => console.log("Service Worker registered successfully:", reg.scope))
-        .catch(err => console.error("Service Worker registration failed:", err));
+        .then(reg => {
+          console.info("Service Worker Registered successfully on scope:", reg.scope);
+          console.groupEnd();
+        })
+        .catch(err => {
+          console.error("Service Worker registration failed:", err);
+          console.groupEnd();
+        });
+
+      // Force page control by reloading client on controller updates
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (refreshing) return;
+        refreshing = true;
+        console.log("[SW] Service Worker controller changed. Reloading page...");
+        window.location.reload();
+      });
     });
   }
 }
@@ -1368,5 +1384,198 @@ export function showToast(options = {}) {
     element: toast,
     dismiss: dismiss
   };
+}
+
+export class CustomDialog {
+  static initStyles() {
+    if (document.getElementById("custom-dialog-styles")) return;
+    const styleEl = document.createElement("style");
+    styleEl.id = "custom-dialog-styles";
+    styleEl.textContent = `
+      .custom-dialog-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(15, 23, 42, 0.45);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 99999;
+        opacity: 0;
+        transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .custom-dialog-backdrop.active {
+        opacity: 1;
+      }
+      .custom-dialog-card {
+        background: rgba(30, 41, 59, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        padding: 24px;
+        max-width: 400px;
+        width: 90%;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        transform: scale(0.95);
+        opacity: 0;
+        transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+        color: #f8fafc;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+      .custom-dialog-backdrop.active .custom-dialog-card {
+        transform: scale(1);
+        opacity: 1;
+      }
+      .custom-dialog-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        margin-bottom: 12px;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .custom-dialog-message {
+        font-size: 0.9rem;
+        line-height: 1.5;
+        color: #cbd5e1;
+        margin-bottom: 24px;
+      }
+      .custom-dialog-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+      }
+      .custom-dialog-btn {
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: none;
+        outline: none;
+      }
+      .custom-dialog-btn-cancel {
+        background: rgba(255, 255, 255, 0.08);
+        color: #e2e8f0;
+      }
+      .custom-dialog-btn-cancel:hover {
+        background: rgba(255, 255, 255, 0.15);
+      }
+      .custom-dialog-btn-confirm {
+        background: var(--accent, #3b82f6);
+        color: #fff;
+      }
+      .custom-dialog-btn-confirm:hover {
+        filter: brightness(1.1);
+        box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+      }
+      .custom-dialog-btn-danger {
+        background: #ef4444;
+        color: #fff;
+      }
+      .custom-dialog-btn-danger:hover {
+        box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+      }
+    `;
+    document.head.appendChild(styleEl);
+  }
+
+  static alert(title, message) {
+    this.initStyles();
+    return new Promise((resolve) => {
+      const backdrop = document.createElement("div");
+      backdrop.className = "custom-dialog-backdrop";
+      backdrop.innerHTML = `
+        <div class="custom-dialog-card" role="dialog" aria-modal="true">
+          <div class="custom-dialog-title">🔔 ${title}</div>
+          <div class="custom-dialog-message">${message}</div>
+          <div class="custom-dialog-actions">
+            <button class="custom-dialog-btn custom-dialog-btn-confirm" id="customDialogOkBtn">OK</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(backdrop);
+
+      requestAnimationFrame(() => backdrop.classList.add("active"));
+
+      const okBtn = backdrop.querySelector("#customDialogOkBtn");
+      okBtn.focus();
+
+      const close = () => {
+        backdrop.classList.remove("active");
+        window.removeEventListener("keydown", handleKeyDown);
+        setTimeout(() => {
+          backdrop.remove();
+          resolve();
+        }, 250);
+      };
+
+      okBtn.addEventListener("click", close);
+
+      const handleKeyDown = (e) => {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          close();
+        }
+      };
+      window.addEventListener("keydown", handleKeyDown);
+    });
+  }
+
+  static confirm(title, message, isDanger = false) {
+    this.initStyles();
+    return new Promise((resolve) => {
+      const backdrop = document.createElement("div");
+      backdrop.className = "custom-dialog-backdrop";
+      backdrop.innerHTML = `
+        <div class="custom-dialog-card" role="dialog" aria-modal="true">
+          <div class="custom-dialog-title">⚠️ ${title}</div>
+          <div class="custom-dialog-message">${message}</div>
+          <div class="custom-dialog-actions">
+            <button class="custom-dialog-btn custom-dialog-btn-cancel" id="customDialogCancelBtn">Cancel</button>
+            <button class="custom-dialog-btn ${isDanger ? 'custom-dialog-btn-danger' : 'custom-dialog-btn-confirm'}" id="customDialogConfirmBtn">Confirm</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(backdrop);
+
+      requestAnimationFrame(() => backdrop.classList.add("active"));
+
+      const cancelBtn = backdrop.querySelector("#customDialogCancelBtn");
+      const confirmBtn = backdrop.querySelector("#customDialogConfirmBtn");
+      confirmBtn.focus();
+
+      const close = (result) => {
+        backdrop.classList.remove("active");
+        window.removeEventListener("keydown", handleKeyDown);
+        setTimeout(() => {
+          backdrop.remove();
+          resolve(result);
+        }, 250);
+      };
+
+      confirmBtn.addEventListener("click", () => close(true));
+      cancelBtn.addEventListener("click", () => close(false));
+
+      backdrop.addEventListener("click", (e) => {
+        if (e.target === backdrop) {
+          close(false);
+        }
+      });
+
+      const handleKeyDown = (e) => {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          close(false);
+        }
+      };
+      window.addEventListener("keydown", handleKeyDown);
+    });
+  }
 }
 
