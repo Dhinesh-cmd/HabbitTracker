@@ -1103,7 +1103,7 @@ export function registerServiceWorker() {
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
       console.group("%c⚙️ Service Worker", "color: #10b981; font-weight: bold;");
-      navigator.serviceWorker.register("./firebase-messaging-sw.js")
+      navigator.serviceWorker.register("./sw.js")
         .then(reg => {
           console.info("Service Worker Registered successfully on scope:", reg.scope);
           console.groupEnd();

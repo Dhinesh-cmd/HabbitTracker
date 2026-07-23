@@ -16,10 +16,6 @@ import {
   showToast,
   CustomDialog
 } from './utils.js';
-import { NotificationManager } from './notification-manager.js';
-import { PushService } from './push-service.js';
-import { MessagingService } from './messaging.js';
-
 class SettingsPageController {
   constructor() {
     const user = StorageManager.getUser();
@@ -46,9 +42,6 @@ class SettingsPageController {
       sleepTimeInput: document.getElementById('sleepTimeInput'),
       soundsToggleInput: document.getElementById('soundsToggleInput'),
       themeToggleSwitch: document.getElementById('themeToggleSwitch'),
-      pushToggleInput: document.getElementById('pushToggleInput'),
-      testNotificationRow: document.getElementById('testNotificationRow'),
-      testNotificationBtn: document.getElementById('testNotificationBtn'),
 
       // JSON backups
       importJsonFileInput: document.getElementById('importJsonFileInput'),
@@ -137,22 +130,6 @@ class SettingsPageController {
     const currentTheme = document.documentElement.getAttribute("data-theme") || "dark";
     this.dom.themeToggleSwitch.checked = currentTheme === "dark";
 
-    // Push Notifications
-    const pushEnabled = settings.pushNotificationsEnabled === true;
-    console.log("Loaded Push Settings: " + pushEnabled);
-    this.dom.pushToggleInput.checked = pushEnabled;
-    
-    // Validate current notification permission and align UI
-    if (pushEnabled && "Notification" in window && Notification.permission === "granted") {
-      this.dom.testNotificationRow.style.display = "flex";
-    } else {
-      this.dom.testNotificationRow.style.display = "none";
-      if (pushEnabled) {
-        // If saved as active but permission is revoked, sync settings
-        this.dom.pushToggleInput.checked = false;
-        this.saveSettingKey("pushNotificationsEnabled", false);
-      }
-    }
     console.groupEnd();
   }
 
@@ -232,79 +209,7 @@ class SettingsPageController {
       this.showLocalToast("Audio Updated", `Reminders sound cues: ${e.target.checked ? 'Enabled' : 'Muted'}.`, "success");
     });
 
-    // Push Notification toggle change
-    this.dom.pushToggleInput.addEventListener('change', async (e) => {
-      const isChecked = e.target.checked;
-      
-      if (isChecked) {
-        if (!("Notification" in window)) {
-          this.showLocalToast("Not Supported", "Push notifications are not supported by this browser.", "warning");
-          this.dom.pushToggleInput.checked = false;
-          return;
-        }
 
-        try {
-          const permission = await Notification.requestPermission();
-          if (permission === "granted") {
-            this.saveSettingKey("pushNotificationsEnabled", true);
-            this.dom.testNotificationRow.style.display = "flex";
-            this.showLocalToast("Notifications Enabled", "You will now receive habit reminder notifications.", "success");
-            
-            // Register FCM Token
-            if ("serviceWorker" in navigator) {
-              const reg = await navigator.serviceWorker.ready;
-              const token = await MessagingService.requestPermissionAndGetToken(reg);
-              if (token) {
-                localStorage.setItem("fcm_token", token);
-                await PushService.syncUserToken(token);
-                // Synchronize all current habits for scheduling
-                const habits = StorageManager.getHabits() || [];
-                await PushService.syncAllHabits(habits);
-                console.log("[FCM] Successfully synchronized token and habits for scheduled reminders.");
-              }
-            }
-
-            // Run audit / smoke test immediately
-            await NotificationManager.runSmokeTest();
-          } else {
-            this.dom.pushToggleInput.checked = false;
-            this.saveSettingKey("pushNotificationsEnabled", false);
-            this.dom.testNotificationRow.style.display = "none";
-            this.showLocalToast("Permission Denied", "Notifications are blocked. Please enable notification permission in your browser settings.", "warning");
-          }
-        } catch (err) {
-          console.error("Error requesting notification permission:", err);
-          this.dom.pushToggleInput.checked = false;
-          this.saveSettingKey("pushNotificationsEnabled", false);
-          this.dom.testNotificationRow.style.display = "none";
-        }
-      } else {
-        this.saveSettingKey("pushNotificationsEnabled", false);
-        this.dom.testNotificationRow.style.display = "none";
-        this.showLocalToast("Notifications Disabled", "Push notifications have been disabled.", "info");
-        
-        try {
-          await PushService.clearUserToken();
-          localStorage.removeItem("fcm_token");
-        } catch (err) {
-          console.error("Failed to disable push notifications on server:", err);
-        }
-      }
-    });
-
-    // Test Notification button logic
-    this.dom.testNotificationBtn.addEventListener('click', () => {
-      if (this.dom.testNotificationBtn.disabled) return;
-      
-      // Brief 500ms debounce to prevent accidental rapid double clicks
-      this.dom.testNotificationBtn.disabled = true;
-      setTimeout(() => {
-        this.dom.testNotificationBtn.disabled = false;
-      }, 500);
-
-      this.showLocalToast("Test Started", "Test push notification scheduled (30s delay).", "success");
-      NotificationManager.scheduleTestSequence();
-    });
 
     // Reset Today Checklist trigger
     this.dom.resetTodayBtn.addEventListener('click', () => {

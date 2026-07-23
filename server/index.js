@@ -109,19 +109,54 @@ async function checkAndSendNotifications() {
 
       if (!token) continue;
 
-      // 1. Get current date/time adjusted to user timezone
-      let localTimeStr;
+      // 1. Get current date/time adjusted to user timezone safely without date parsing shift
+      let localDateStr;
+      let localHours;
+      let localMinutes;
+      let localDayOfWeek;
+
       try {
-        localTimeStr = new Date().toLocaleString("en-US", { timeZone: timezone });
+        const formatter = new Intl.DateTimeFormat("en-US", {
+          timeZone: timezone,
+          year: "numeric",
+          month: "numeric",
+          day: "numeric",
+          hour: "numeric",
+          minute: "numeric",
+          second: "numeric",
+          hour12: false
+        });
+        
+        const parts = formatter.formatToParts(new Date());
+        const partValues = {};
+        parts.forEach(p => {
+          partValues[p.type] = p.value;
+        });
+
+        const year = parseInt(partValues.year, 10);
+        const month = parseInt(partValues.month, 10);
+        const day = parseInt(partValues.day, 10);
+        
+        localHours = parseInt(partValues.hour, 10);
+        if (localHours === 24) localHours = 0;
+        
+        localMinutes = parseInt(partValues.minute, 10);
+        localDateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        
+        // Reconstruct local day of week without time shift
+        localDayOfWeek = new Date(year, month - 1, day).getDay();
       } catch (err) {
-        console.error(`Invalid timezone "${timezone}" for user ${userDoc.id}, fallback to UTC.`);
-        localTimeStr = new Date().toLocaleString("en-US", { timeZone: "UTC" });
+        console.error(`Invalid timezone "${timezone}" for user ${userDoc.id}, fallback to UTC:`, err.message);
+        const utcDate = new Date();
+        localHours = utcDate.getUTCHours();
+        localMinutes = utcDate.getUTCMinutes();
+        localDayOfWeek = utcDate.getUTCDay();
+        localDateStr = formatDate(utcDate);
       }
-      
-      const localDate = new Date(localTimeStr);
-      const todayStr = formatDate(localDate);
-      const currentMinutes = localDate.getHours() * 60 + localDate.getMinutes();
-      const dayOfWeek = localDate.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+
+      const todayStr = localDateStr;
+      const currentMinutes = localHours * 60 + localMinutes;
+      const dayOfWeek = localDayOfWeek;
 
       // 2. Fetch user's habits
       const habitsSnapshot = await db.collection("users").doc(userDoc.id).collection("habits").get();
