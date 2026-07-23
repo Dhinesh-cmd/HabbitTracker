@@ -20,6 +20,11 @@ import { NotificationManager } from './notification-manager.js';
 
 class SettingsPageController {
   constructor() {
+    const user = StorageManager.getUser();
+    if (!user) {
+      window.location.href = "login.html";
+      return;
+    }
     this.currentDate = new Date();
     this.todayStr = StorageManager.formatDate(this.currentDate);
 
@@ -61,6 +66,10 @@ class SettingsPageController {
       wipeDatabaseConfirmModal: document.getElementById('wipeDatabaseConfirmModal'),
       cancelWipeBtn: document.getElementById('cancelWipeBtn'),
       confirmWipeBtn: document.getElementById('confirmWipeBtn'),
+      clearHistoryBtn: document.getElementById('clearHistoryBtn'),
+      clearHistoryConfirmModal: document.getElementById('clearHistoryConfirmModal'),
+      cancelClearHistoryBtn: document.getElementById('cancelClearHistoryBtn'),
+      confirmClearHistoryBtn: document.getElementById('confirmClearHistoryBtn'),
       notificationContainer: document.getElementById('notificationContainer')
     };
 
@@ -200,7 +209,16 @@ class SettingsPageController {
     this.dom.sleepTimeInput.addEventListener('change', (e) => {
       const val = e.target.value || "22:30";
       this.saveSettingKey("sleepTime", val);
-      this.showLocalToast("Sleep Time Updated", `Daily summary scheduled at 5 minutes before ${val}.`, "success");
+      
+      // Convert to 12-hour AM/PM format
+      const [hourStr, minStr] = val.split(':');
+      let hour = parseInt(hourStr, 10);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      hour = hour % 12;
+      hour = hour ? hour : 12;
+      const formattedTime = `${String(hour).padStart(2, '0')}:${minStr} ${ampm}`;
+      
+      this.showLocalToast("Sleep Time Updated", `Daily summary scheduled at 5 minutes before ${formattedTime}.`, "success");
     });
 
     // Sound toggle config save on change
@@ -287,52 +305,153 @@ class SettingsPageController {
     });
 
 
-    // Wipe Database Trigger (Using custom modern dialog)
-    this.dom.clearAllHistoryBtn.addEventListener('click', async () => {
-      const confirmed = await CustomDialog.confirm("Wipe Database", "Are you sure you want to permanently clear all tracking history, streaks, and analytics? This will preserve your profile, routines, and app settings. This cannot be undone.", true);
-      
-      if (!confirmed) {
-        console.log("Database wipe cancelled by user.");
-        return;
-      }
-
-      console.group("%c🔥 Database Wiped", "color: #ef4444; font-weight: bold;");
-      try {
-        if (this.dom.loadingOverlay) {
-          this.dom.loadingOverlay.classList.remove('fade-out');
-        }
-
-        // 1. Get raw HabitTracker data and keep only settings object
-        const rawData = StorageManager.getRawData();
-        const settings = rawData.settings || {};
-        const cleanedData = {
-          settings: settings
-        };
-        StorageManager.saveRawData(cleanedData);
-        console.log("Date-based completion and tracker logs removed. Settings preserved.");
-
-        // 2. Clear notified slots logs from local storage to allow fresh reminders
-        Object.keys(localStorage).forEach(key => {
-          if (key.startsWith("notified_slots_")) {
-            localStorage.removeItem(key);
-            console.log(`Removed notified slot log: ${key}`);
-          }
+    // --- Wipe Database Modal Interactions ---
+    const openWipeModal = () => {
+      if (this.dom.wipeDatabaseConfirmModal) {
+        this.dom.wipeDatabaseConfirmModal.style.display = 'flex';
+        document.body.classList.add('modal-open');
+        requestAnimationFrame(() => {
+          this.dom.wipeDatabaseConfirmModal.classList.add('active');
         });
+      }
+    };
 
-        // note: dailyHabits (routines configuration) and habitTrackerUser (profile) are left intact in localStorage!
-
-        this.showLocalToast("Wiped Clean", "All tracking logs and history have been cleared. Routines and settings preserved.", "warning");
-        console.info("Database wipe completed successfully. Reloading...");
-
+    const closeWipeModal = () => {
+      if (this.dom.wipeDatabaseConfirmModal) {
+        this.dom.wipeDatabaseConfirmModal.classList.remove('active');
+        document.body.classList.remove('modal-open');
         setTimeout(() => {
-          window.location.reload();
-        }, 1000);
+          this.dom.wipeDatabaseConfirmModal.style.display = 'none';
+        }, 300);
+      }
+    };
 
-      } catch (error) {
-        console.error("Error during database wipe execution:", error);
-        this.showLocalToast("Wipe Failed", "An error occurred during database wipe.", "danger");
-      } finally {
-        console.groupEnd();
+    this.dom.clearAllHistoryBtn.addEventListener('click', openWipeModal);
+    if (this.dom.cancelWipeBtn) {
+      this.dom.cancelWipeBtn.addEventListener('click', closeWipeModal);
+    }
+    if (this.dom.wipeDatabaseConfirmModal) {
+      this.dom.wipeDatabaseConfirmModal.addEventListener('click', (e) => {
+        if (e.target === this.dom.wipeDatabaseConfirmModal) closeWipeModal();
+      });
+    }
+
+    if (this.dom.confirmWipeBtn) {
+      this.dom.confirmWipeBtn.addEventListener('click', async () => {
+        this.dom.confirmWipeBtn.disabled = true;
+        this.dom.confirmWipeBtn.innerText = "Clearing...";
+        if (this.dom.cancelWipeBtn) this.dom.cancelWipeBtn.disabled = true;
+        
+        console.group("%c🔥 Database Wiped", "color: #ef4444; font-weight: bold;");
+        try {
+          if (this.dom.loadingOverlay) {
+            this.dom.loadingOverlay.classList.remove('fade-out');
+          }
+          localStorage.clear();
+          sessionStorage.clear();
+          console.log("LocalStorage and SessionStorage successfully cleared.");
+
+          this.showLocalToast("Wiped Clean", "Database wiped successfully. Redirecting to Login...", "warning");
+          setTimeout(() => {
+            window.location.href = "login.html";
+          }, 1000);
+        } catch (error) {
+          console.error("Error during database wipe execution:", error);
+          this.showLocalToast("Wipe Failed", "An error occurred during database wipe.", "danger");
+          this.dom.confirmWipeBtn.disabled = false;
+          this.dom.confirmWipeBtn.innerText = "Clear Everything";
+          if (this.dom.cancelWipeBtn) this.dom.cancelWipeBtn.disabled = false;
+        } finally {
+          console.groupEnd();
+        }
+      });
+    }
+
+    // --- Clear History & Analytics Modal Interactions ---
+    const openClearHistoryModal = () => {
+      if (this.dom.clearHistoryConfirmModal) {
+        this.dom.clearHistoryConfirmModal.style.display = 'flex';
+        document.body.classList.add('modal-open');
+        requestAnimationFrame(() => {
+          this.dom.clearHistoryConfirmModal.classList.add('active');
+        });
+      }
+    };
+
+    const closeClearHistoryModal = () => {
+      if (this.dom.clearHistoryConfirmModal) {
+        this.dom.clearHistoryConfirmModal.classList.remove('active');
+        document.body.classList.remove('modal-open');
+        setTimeout(() => {
+          this.dom.clearHistoryConfirmModal.style.display = 'none';
+        }, 300);
+      }
+    };
+
+    if (this.dom.clearHistoryBtn) {
+      this.dom.clearHistoryBtn.addEventListener('click', openClearHistoryModal);
+    }
+    if (this.dom.cancelClearHistoryBtn) {
+      this.dom.cancelClearHistoryBtn.addEventListener('click', closeClearHistoryModal);
+    }
+    if (this.dom.clearHistoryConfirmModal) {
+      this.dom.clearHistoryConfirmModal.addEventListener('click', (e) => {
+        if (e.target === this.dom.clearHistoryConfirmModal) closeClearHistoryModal();
+      });
+    }
+
+    if (this.dom.confirmClearHistoryBtn) {
+      this.dom.confirmClearHistoryBtn.addEventListener('click', async () => {
+        this.dom.confirmClearHistoryBtn.disabled = true;
+        this.dom.confirmClearHistoryBtn.innerText = "Clearing...";
+        if (this.dom.cancelClearHistoryBtn) this.dom.cancelClearHistoryBtn.disabled = true;
+
+        console.group("%c📊 History & Analytics Cleared", "color: #3b82f6; font-weight: bold;");
+        try {
+          if (this.dom.loadingOverlay) {
+            this.dom.loadingOverlay.classList.remove('fade-out');
+          }
+
+          // 1. Get raw HabitTracker data and keep only settings object
+          const rawData = StorageManager.getRawData();
+          const settings = rawData.settings || {};
+          const cleanedData = {
+            settings: settings
+          };
+          StorageManager.saveRawData(cleanedData);
+          console.log("All date-based completion records and tracker logs removed from HabitTracker database.");
+
+          // 2. Clear notified slots logs from local storage to reset reminders
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith("notified_slots_")) {
+              localStorage.removeItem(key);
+              console.log(`Removed notified slot log: ${key}`);
+            }
+          });
+
+          this.showLocalToast("Cleaned", "History & Analytics cleared successfully.", "success");
+          console.info("History & Analytics cleanup completed successfully.");
+          
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        } catch (error) {
+          console.error("Error during history & analytics cleanup execution:", error);
+          this.showLocalToast("Cleanup Failed", "An error occurred during cleanup.", "danger");
+          this.dom.confirmClearHistoryBtn.disabled = false;
+          this.dom.confirmClearHistoryBtn.innerText = "Clear History";
+          if (this.dom.cancelClearHistoryBtn) this.dom.cancelClearHistoryBtn.disabled = false;
+        } finally {
+          console.groupEnd();
+        }
+      });
+    }
+
+    // Global Key Listener for modal close
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeWipeModal();
+        closeClearHistoryModal();
       }
     });
 

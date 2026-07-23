@@ -1799,9 +1799,7 @@ class HabitTrackerApp {
   checkUserRegistration() {
     const user = StorageManager.getUser();
     if (!user) {
-      if (this.dom.registrationModal) {
-        this.dom.registrationModal.classList.add('active');
-      }
+      window.location.href = "login.html";
     }
   }
 

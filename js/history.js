@@ -16,6 +16,11 @@ import {
 
 class HistoryPageController {
   constructor() {
+    const user = StorageManager.getUser();
+    if (!user) {
+      window.location.href = "login.html";
+      return;
+    }
     this.currentDate = new Date();
     this.todayStr = StorageManager.formatDate(this.currentDate);
     this.historyData = {};

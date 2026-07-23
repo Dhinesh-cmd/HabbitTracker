@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - My Daily Habit Tracker</title>
+  
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="A premium minimalist Daily Habit Tracker built to help you maintain consistency, track streaks, and analyze daily routines.">
+  <meta name="theme-color" content="#0F172A">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+  
+  <!-- CSS Stylesheets -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background: radial-gradient(circle at top right, rgba(59, 130, 246, 0.08), transparent 40%),
+                  radial-gradient(circle at bottom left, rgba(236, 72, 153, 0.05), transparent 40%),
+                  #0F172A;
+      color: #F8FAFC;
+    }
+    
+    .login-container {
+      width: 100%;
+      max-width: 440px;
+      margin: 20px;
+      padding: 32px;
+      border-radius: 20px;
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+    
+    .login-header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    
+    .login-logo {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 56px;
+      height: 56px;
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      border-radius: 14px;
+      color: var(--primary, #3b82f6);
+      font-size: 1.75rem;
+      margin-bottom: 16px;
+      box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
+    }
+    
+    .login-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #FFF;
+      margin: 0 0 6px 0;
+    }
+    
+    .login-subtitle {
+      font-size: 0.875rem;
+      color: #94A3B8;
+      margin: 0;
+    }
+    
+    .login-input-group {
+      margin-bottom: 18px;
+    }
+    
+    .login-label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #E2E8F0;
+      margin-bottom: 6px;
+    }
+    
+    .login-input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    
+    .login-icon {
+      position: absolute;
+      left: 14px;
+      color: #64748B;
+      font-size: 1rem;
+    }
+    
+    .login-input {
+      width: 100%;
+      padding: 11px 14px 11px 40px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(15, 23, 42, 0.6);
+      color: #FFF;
+      font-family: inherit;
+      font-size: 0.9rem;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+    
+    .login-input:focus {
+      border-color: var(--primary, #3b82f6);
+      box-shadow: 0 0 8px rgba(59, 130, 246, 0.25);
+    }
+    
+    .login-row {
+      display: flex;
+      gap: 16px;
+    }
+    
+    .login-row .login-input-group {
+      flex: 1;
+    }
+    
+    .login-gender-control {
+      display: flex;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    
+    .login-gender-option {
+      flex: 1;
+      position: relative;
+    }
+    
+    .login-gender-option input {
+      position: absolute;
+      opacity: 0;
+      cursor: pointer;
+      height: 0;
+      width: 0;
+    }
+    
+    .login-gender-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: #94A3B8;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: center;
+    }
+    
+    .login-gender-option input:checked + .login-gender-label {
+      border-color: var(--primary, #3b82f6);
+      background: rgba(59, 130, 246, 0.1);
+      color: #3b82f6;
+    }
+    
+    .login-btn {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      border-radius: 10px;
+      border: none;
+      background: linear-gradient(135deg, #3B82F6, #1D4ED8);
+      color: #FFF;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+      transition: all 0.2s ease;
+    }
+    
+    .login-btn:hover {
+      filter: brightness(1.1);
+      box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
+    }
+    
+    .login-error {
+      color: #EF4444;
+      font-size: 0.75rem;
+      margin-top: 4px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-container">
+    <div class="login-header">
+      <div class="login-logo">
+        <i class="fa-solid fa-square-check"></i>
+      </div>
+      <h2 class="login-title">Create Profile</h2>
+      <p class="login-subtitle">Setup your habit tracker to begin consistency</p>
+    </div>
+    
+    <form id="loginForm" novalidate>
+      <div class="login-input-group">
+        <label class="login-label" for="loginName">Name *</label>
+        <div class="login-input-wrapper">
+          <span class="login-icon"><i class="fa-solid fa-user"></i></span>
+          <input type="text" id="loginName" class="login-input" placeholder="e.g. Dhinesh" required>
+        </div>
+        <div class="login-error" id="errorName">Name is required.</div>
+      </div>
+      
+      <div class="login-input-group">
+        <label class="login-label" for="loginAge">Age *</label>
+        <div class="login-input-wrapper">
+          <span class="login-icon"><i class="fa-solid fa-calendar-day"></i></span>
+          <input type="number" id="loginAge" class="login-input" placeholder="e.g. 25" min="5" max="120" required>
+        </div>
+        <div class="login-error" id="errorAge">Age must be between 5 and 120.</div>
+      </div>
+      
+      <div class="login-row">
+        <div class="login-input-group">
+          <label class="login-label" for="loginWeight">Weight (kg)</label>
+          <div class="login-input-wrapper">
+            <span class="login-icon"><i class="fa-solid fa-weight-scale"></i></span>
+            <input type="number" id="loginWeight" class="login-input" placeholder="e.g. 65">
+          </div>
+        </div>
+        
+        <div class="login-input-group">
+          <label class="login-label" for="loginHeight">Height (cm)</label>
+          <div class="login-input-wrapper">
+            <span class="login-icon"><i class="fa-solid fa-ruler-vertical"></i></span>
+            <input type="number" id="loginHeight" class="login-input" placeholder="e.g. 170">
+          </div>
+        </div>
+      </div>
+      
+      <div class="login-input-group">
+        <label class="login-label">Gender *</label>
+        <div class="login-gender-control">
+          <label class="login-gender-option">
+            <input type="radio" name="loginGender" value="Male" required>
+            <span class="login-gender-label">Male</span>
+          </label>
+          <label class="login-gender-option">
+            <input type="radio" name="loginGender" value="Female" required>
+            <span class="login-gender-label">Female</span>
+          </label>
+          <label class="login-gender-option">
+            <input type="radio" name="loginGender" value="Other" required>
+            <span class="login-gender-label">Other</span>
+          </label>
+        </div>
+        <div class="login-error" id="errorGender">Please select your gender.</div>
+      </div>
+      
+      <button type="submit" class="login-btn">Start Tracking</button>
+    </form>
+  </div>
+
+  <script type="module">
+    import { StorageManager } from './js/storage.js';
+    
+    // Redirect if user profile already exists
+    if (StorageManager.getUser()) {
+      window.location.href = "index.html";
+    }
+
+    const form = document.getElementById("loginForm");
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      
+      // Reset errors
+      document.querySelectorAll(".login-error").forEach(el => el.style.display = "none");
+      
+      const name = document.getElementById("loginName").value.trim();
+      const age = parseInt(document.getElementById("loginAge").value);
+      const weight = document.getElementById("loginWeight").value.trim();
+      const height = document.getElementById("loginHeight").value.trim();
+      const genderActive = document.querySelector('input[name="loginGender"]:checked');
+      
+      let hasError = false;
+      
+      if (!name) {
+        document.getElementById("errorName").style.display = "block";
+        hasError = true;
+      }
+      
+      if (isNaN(age) || age < 5 || age > 120) {
+        document.getElementById("errorAge").style.display = "block";
+        hasError = true;
+      }
+      
+      if (!genderActive) {
+        document.getElementById("errorGender").style.display = "block";
+        hasError = true;
+      }
+      
+      if (hasError) return;
+      
+      const user = {
+        name,
+        age,
+        weight: weight ? parseFloat(weight) : "",
+        height: height ? parseFloat(height) : "",
+        gender: genderActive.value,
+        createdAt: new Date().toISOString()
+      };
+      
+      StorageManager.saveUser(user);
+      
+      // Pre-fill app settings defaults
+      const raw = StorageManager.getRawData();
+      if (!raw.settings) raw.settings = {};
+      raw.settings.userName = name;
+      raw.settings.sleepTime = "22:30";
+      raw.settings.sounds = true;
+      raw.settings.pushNotificationsEnabled = false;
+      StorageManager.saveRawData(raw);
+
+      window.location.href = "index.html";
+    });
+  </script>
+</body>
+</html>
