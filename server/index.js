@@ -134,8 +134,10 @@ async function checkAndSendNotifications() {
         const scheduledMinutes = getMinutesFromTimeString(scheduledTime);
         if (scheduledMinutes === null) continue;
 
-        // 4. Verify Time Match or Snoozed Match
-        let isTimeTrigger = currentMinutes === scheduledMinutes;
+        // 4. Verify Time Match or Snoozed Match (Reminder fires REMINDER_OFFSET before)
+        const REMINDER_OFFSET = 5;
+        const triggerMinutes = (scheduledMinutes - REMINDER_OFFSET + 1440) % 1440;
+        let isTimeTrigger = currentMinutes === triggerMinutes;
         
         if (habit.snoozedUntil) {
           const snoozeDate = new Date(habit.snoozedUntil);
@@ -165,7 +167,6 @@ async function checkAndSendNotifications() {
         } else if (repeat === "weekends") {
           matchesDay = dayOfWeek === 0 || dayOfWeek === 6;
         } else if (repeat === "custom" || habit.days) {
-          // days array contains Javascript week indices (e.g. 0 for Sunday)
           const targetDays = Array.isArray(habit.days) ? habit.days.map(Number) : [];
           matchesDay = targetDays.includes(dayOfWeek);
         }
@@ -186,7 +187,8 @@ async function checkAndSendNotifications() {
             habitId: habit.id,
             habitName: habit.name,
             category: habit.category || "others",
-            time: scheduledTime
+            time: scheduledTime,
+            items: JSON.stringify(habit.items || [])
           },
           android: {
             priority: "high"
@@ -205,7 +207,6 @@ async function checkAndSendNotifications() {
           console.log(`Successfully sent FCM notification for habit "${habit.name}" to user ${userDoc.id}. Response:`, response);
         } catch (fcmError) {
           console.error(`FCM sending failed for user ${userDoc.id}:`, fcmError.message);
-          // If token is invalid/not registered, clean up/delete user token
           if (fcmError.code === "messaging/registration-token-not-registered") {
             console.log(`Removing expired token for user ${userDoc.id}`);
             await db.collection("users").doc(userDoc.id).update({ token: admin.firestore.FieldValue.delete() });
@@ -223,9 +224,42 @@ cron.schedule("* * * * *", () => {
   checkAndSendNotifications();
 });
 
-// Basic HTTP health routes
+// health routes
 app.get("/health", (req, res) => {
   res.json({ status: "OK", timestamp: new Date().toISOString() });
+});
+
+// Test Notification Endpoint
+app.post("/test-notification", (req, res) => {
+  const { token } = req.body;
+  if (!token) {
+    return res.status(400).json({ error: "FCM token is required." });
+  }
+
+  res.json({ message: "Test notification scheduled. Firing in 30 seconds." });
+
+  setTimeout(async () => {
+    const message = {
+      token: token,
+      data: {
+        habitId: "test-notification-id",
+        habitName: "Habit Tracker",
+        category: "others",
+        time: "Test time",
+        isTest: "true"
+      },
+      android: {
+        priority: "high"
+      }
+    };
+
+    try {
+      await admin.messaging().send(message);
+      console.log("Successfully sent test FCM push after 30 seconds.");
+    } catch (err) {
+      console.error("Failed to send test push:", err.message);
+    }
+  }, 30000);
 });
 
 // Run server

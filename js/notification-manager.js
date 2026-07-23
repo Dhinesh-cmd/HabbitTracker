@@ -296,36 +296,51 @@ export class NotificationManager {
   /**
    * Schedules the test notification timeline
    */
-  static scheduleTestSequence(onComplete) {
-    // Clear any previous running timers
-    this.testTimeoutIds.forEach(id => clearTimeout(id));
-    this.testTimeoutIds = [];
-
-    console.log("[Notification] Test sequence initialized.");
+  static async scheduleTestSequence(onComplete) {
+    console.log("[Notification] Test notification scheduled. Firing in 30 seconds.");
     
-    // Immediate smoke test notification
-    this.sendNotification("My Habit Tracker", "Immediate Smoke Test: If you see this, notifications are working!");
+    // Try to get token from storage
+    let fcmToken = null;
+    try {
+      const rawData = JSON.parse(localStorage.getItem("HabitTracker") || "{}");
+      fcmToken = localStorage.getItem("fcm_token") || rawData.settings?.fcmToken;
+    } catch (e) {}
 
-    const intervals = [
-      { num: 1, delay: 30000 },
-      { num: 2, delay: 60000 },
-      { num: 3, delay: 90000 },
-      { num: 4, delay: 120000 },
-      { num: 5, delay: 150000 }
-    ];
+    let sentViaServer = false;
 
-    intervals.forEach(step => {
-      console.log(`[Notification] Notification #${step.num} scheduled for +${step.delay / 1000}s`);
-      const timerId = setTimeout(() => {
-        console.log(`[Notification] Notification #${step.num} fired`);
-        this.sendNotification("My Habit Tracker", `This is test notification ${step.num} of 5.`);
+    if (fcmToken) {
+      try {
+        console.log("[Notification] Attempting to trigger test push via backend server...");
+        // Match dev environment vs production path
+        const serverUrl = window.location.origin.includes("5505") || window.location.origin.includes("5500") || window.location.origin.includes("127.0.0.1")
+          ? "http://localhost:5000/test-notification" 
+          : "/test-notification";
+
+        const res = await fetch(serverUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: fcmToken })
+        });
         
-        if (step.num === 5 && onComplete) {
-          onComplete();
+        if (res.ok) {
+          console.log("[Notification] Backend test notification registered successfully.");
+          sentViaServer = true;
+          if (onComplete) onComplete();
         }
-      }, step.delay);
+      } catch (err) {
+        console.warn("Backend test trigger failed, falling back to local timer:", err.message);
+      }
+    }
+
+    if (!sentViaServer) {
+      // Local timer fallback
+      console.log("[Notification] Running local fallback timeout (30 seconds). Keep tab open for delivery.");
+      const timerId = setTimeout(() => {
+        this.sendNotification("Habit Tracker", "This is a test notification. Your push notifications are working correctly.");
+        if (onComplete) onComplete();
+      }, 30000);
       
       this.testTimeoutIds.push(timerId);
-    });
+    }
   }
 }

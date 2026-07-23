@@ -59,6 +59,24 @@ export class PushService {
   }
 
   /**
+   * Clear user token from Firestore to stop receiving push notifications.
+   */
+  static async clearUserToken() {
+    const user = await this.ensureAuthenticated();
+    if (!user) return;
+
+    try {
+      await setDoc(doc(db, "users", user.uid), {
+        token: null,
+        lastActive: new Date().toISOString()
+      }, { merge: true });
+      console.log("User token cleared from Firestore.");
+    } catch (error) {
+      console.error("Failed to clear user token in Firestore:", error);
+    }
+  }
+
+  /**
    * Sync a single habit to Firestore.
    * @param {Object} habit The habit object to sync
    */

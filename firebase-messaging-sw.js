@@ -42,6 +42,19 @@ messaging.onBackgroundMessage((payload) => {
  * Group notifications and construct the final push alert
  */
 async function handlePushMessage(data) {
+  // 1. Handle Test Notification Immediately
+  if (data.isTest === "true") {
+    const options = {
+      body: "This is a test notification.\nYour push notifications are working correctly.",
+      icon: "assets/icons/icon-192.png",
+      badge: "assets/icons/icon-192.png",
+      tag: "test_notification",
+      vibrate: [100, 50, 100],
+      requireInteraction: true
+    };
+    return self.registration.showNotification("Habit Tracker", options);
+  }
+
   // Check existing notifications to group them if they trigger at the same time
   const activeNotifications = await self.registration.getNotifications();
   
@@ -96,7 +109,21 @@ async function handlePushMessage(data) {
   if (uniqueHabits.length === 1) {
     const habit = uniqueHabits[0];
     title = `${categoryMeta.icon} ${habit.name} Reminder`;
-    body = `Time to complete your habit! \nTime: ${habit.time}`;
+    
+    // Parse items to display checklist bullets
+    let items = [];
+    if (data.items) {
+      try {
+        items = JSON.parse(data.items);
+      } catch (err) {}
+    }
+    
+    let itemsText = "";
+    if (Array.isArray(items) && items.length > 0) {
+      itemsText = "\n" + items.map(item => `• ${item.name || item}`).join("\n");
+    }
+
+    body = `${habit.time}${itemsText}`;
     
     actions = [
       { action: "complete", title: "✅ Mark Done" },
@@ -106,7 +133,7 @@ async function handlePushMessage(data) {
   } else {
     // Multi-notification collapsing/grouping
     title = `🌅 ${categoryMeta.name} Routine`;
-    body = uniqueHabits.map(h => `• ${h.name}`).join("\n") + `\n\n${uniqueHabits.length} Tasks Pending`;
+    body = uniqueHabits.map(h => `• ${h.name} (${h.time})`).join("\n") + `\n\n${uniqueHabits.length} Tasks Pending`;
     
     actions = [
       { action: "complete_all", title: "✅ Mark All Completed" },
@@ -141,9 +168,21 @@ self.addEventListener("notificationclick", (event) => {
 
   notification.close();
 
-  event.waitUntil(
-    handleNotificationAction(notification, action)
-  );
+  const promiseChain = Promise.all([
+    handleNotificationAction(notification, action),
+    (!action) ? self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes(self.location.origin) && "focus" in client) {
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow("./index.html");
+      }
+    }) : Promise.resolve()
+  ]);
+
+  event.waitUntil(promiseChain);
 });
 
 /**
@@ -248,3 +287,83 @@ function getTodayDateString() {
   const d = String(now.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
+
+// --- PWA Offline Cache Features ---
+const CACHE_NAME = "habit-tracker-v2";
+const ASSETS_TO_CACHE = [
+  "./",
+  "./index.html",
+  "./history.html",
+  "./stats.html",
+  "./settings.html",
+  "./login.html",
+  "./css/style.css",
+  "./css/history.css",
+  "./css/stats.css",
+  "./css/settings.css",
+  "./js/storage.js",
+  "./js/utils.js",
+  "./js/app.js",
+  "./js/history.js",
+  "./js/stats.js",
+  "./js/settings.js",
+  "./js/firebase.js",
+  "./js/push-service.js",
+  "./js/messaging.js",
+  "./js/notification-manager.js",
+  "./manifest.json",
+  "./assets/icons/icon-192.png",
+  "./assets/icons/icon-512.png"
+];
+
+self.addEventListener("install", (e) => {
+  console.log("[SW] Installed");
+  e.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      console.log("[Service Worker] Caching files for offline accessibility.");
+      return cache.addAll(ASSETS_TO_CACHE);
+    })
+  );
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (e) => {
+  console.log("[SW] Activated");
+  e.waitUntil(
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.map((key) => {
+          if (key !== CACHE_NAME) {
+            console.log("[Service Worker] Clearing old cache: ", key);
+            return caches.delete(key);
+          }
+        })
+      );
+    })
+  );
+  self.clients.claim();
+});
+
+self.addEventListener("fetch", (e) => {
+  if (e.request.method !== "GET" || !e.request.url.startsWith(self.location.origin)) {
+    return;
+  }
+  e.respondWith(
+    fetch(e.request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const responseClone = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(e.request, responseClone);
+          });
+        }
+        return networkResponse;
+      })
+      .catch(() => {
+        return caches.match(e.request).then((cachedResponse) => {
+          if (cachedResponse) return cachedResponse;
+          console.warn("[Service Worker] Fetch failed offline. Resource unavailable: ", e.request.url);
+        });
+      })
+  );
+});
