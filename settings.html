@@ -134,14 +134,35 @@
       </section>
 
 
+      <!-- Data Backup & Restore Card -->
+      <section class="glass-card settings-section-card">
+        <h3 class="settings-section-title">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Data Backup & Restore
+        </h3>
+
+        <div class="settings-row">
+          <div class="settings-info">
+            <span class="settings-label">Backup & Restore</span>
+            <span class="settings-description">Export your habits, history, and preferences to a backup file, or restore data from a previous backup.</span>
+          </div>
+          <div class="btn-group-actions">
+            <button id="uploadDataBtn" class="settings-btn">
+              <i class="fa-solid fa-cloud-arrow-up"></i> Upload Data
+            </button>
+            <button id="downloadDataBtn" class="settings-btn btn-primary">
+              <i class="fa-solid fa-cloud-arrow-down"></i> Download Data
+            </button>
+          </div>
+        </div>
+      </section>
+
       <!-- Backups Configuration Card -->
       <section class="glass-card settings-section-card">
         <h3 class="settings-section-title">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           Data Reporting
         </h3>
-
-
 
         <!-- Report Download CSV/PDF -->
         <div class="settings-row">
@@ -191,6 +212,15 @@
             <span class="settings-description" style="color: var(--text-muted);">Clears all history records, analytics, charts, reports, and statistics while preserving user settings, habits, categories, login session, and application configuration.</span>
           </div>
           <button id="clearHistoryBtn" class="settings-btn btn-danger" style="background: rgba(239, 68, 68, 0.05);">Clear History</button>
+        </div>
+
+        <!-- Clear Habits -->
+        <div class="settings-row">
+          <div class="settings-info">
+            <span class="settings-label" style="color: var(--danger);">Clear Habits</span>
+            <span class="settings-description" style="color: var(--text-muted);">Permanently removes all habits across all categories and their completion history. Your user profile, settings, theme, and audio preferences will remain intact.</span>
+          </div>
+          <button id="clearHabitsBtn" class="settings-btn btn-danger" style="background: rgba(239, 68, 68, 0.05);">Clear Habits</button>
         </div>
       </section>
 
@@ -247,6 +277,245 @@
       <div style="display: flex; gap: 12px; justify-content: center;">
         <button class="notify-btn snooze" id="cancelClearHistoryBtn" style="padding: 10px 20px;">Cancel</button>
         <button class="notify-btn complete" id="confirmClearHistoryBtn" style="background: #3B82F6; padding: 10px 20px;">Clear History</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Clear Habits Modal -->
+  <div id="clearHabitsConfirmModal" class="history-modal-backdrop" role="dialog" aria-modal="true" style="width: 100vw; display: none; justify-content: center; z-index: 99999;">
+    <div class="history-modal-content" style="max-width: 440px; text-align: center; padding: 32px 24px;">
+      <div style="font-size: 3rem; color: #EF4444; margin-bottom: 16px;">🗑️</div>
+      <h2 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 12px; color: #FFF;">Clear All Habits?</h2>
+      <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px; line-height: 1.5;">
+        Are you sure you want to permanently clear all habits and their associated completion records?
+      </p>
+      
+      <div style="text-align: left; background: rgba(15, 23, 42, 0.4); border-radius: 12px; padding: 16px 20px; margin-bottom: 16px; border: 1px solid rgba(255, 255, 255, 0.04);">
+        <p style="font-size: 0.85rem; font-weight: 600; color: #EF4444; margin: 0 0 8px 0;">This will permanently remove:</p>
+        <ul style="list-style: none; padding: 0; margin: 0 0 12px 0; display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: #CBD5E1;">
+          <li><span style="color: #EF4444; font-weight: bold; margin-right: 6px;">✕</span> All habits across Diet, Routine, Skin Care, Hair Care & Others</li>
+          <li><span style="color: #EF4444; font-weight: bold; margin-right: 6px;">✕</span> Completion history & timestamps for all habits</li>
+          <li><span style="color: #EF4444; font-weight: bold; margin-right: 6px;">✕</span> Habit-dependent streaks and leaderboard rankings</li>
+        </ul>
+
+        <p style="font-size: 0.85rem; font-weight: 600; color: #10B981; margin: 0 0 8px 0;">This will preserve:</p>
+        <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: #CBD5E1;">
+          <li><span style="color: #10B981; font-weight: bold; margin-right: 6px;">✓</span> User profile (name, age, login session)</li>
+          <li><span style="color: #10B981; font-weight: bold; margin-right: 6px;">✓</span> Sleep time, sound alerts, and theme preferences</li>
+          <li><span style="color: #10B981; font-weight: bold; margin-right: 6px;">✓</span> Non-habit daily logs (water, sleep, notes)</li>
+        </ul>
+      </div>
+
+      <p style="color: #EF4444; font-size: 0.85rem; font-weight: 600; margin-bottom: 24px;">This action cannot be undone.</p>
+      
+      <div style="display: flex; gap: 12px; justify-content: center;">
+        <button class="notify-btn snooze" id="cancelClearHabitsBtn" style="padding: 10px 20px;">Cancel</button>
+        <button class="notify-btn complete" id="confirmClearHabitsBtn" style="background: var(--danger); padding: 10px 20px;">Clear All Habits</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export Data Modal (Download Data) -->
+  <div id="exportDataModal" class="history-modal-backdrop" role="dialog" aria-modal="true" style="width: 100vw; display: none; justify-content: center; z-index: 99999;">
+    <div class="history-modal-content backup-modal-content" style="max-width: 520px; text-align: left; padding: 28px 24px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(59, 130, 246, 0.15); display: flex; align-items: center; justify-content: center; color: var(--accent);">
+            <i class="fa-solid fa-cloud-arrow-down" style="font-size: 1.1rem;"></i>
+          </div>
+          <div>
+            <h2 style="font-size: 1.25rem; font-weight: 700; color: #FFF; margin: 0;">Export Your Data</h2>
+            <p style="color: var(--text-muted); font-size: 0.8rem; margin: 2px 0 0 0;">Select one or multiple categories to backup.</p>
+          </div>
+        </div>
+        <button class="modal-close-icon-btn" id="closeExportModalBtn" aria-label="Close export dialog">&times;</button>
+      </div>
+
+      <!-- Select / Deselect All Controls -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 4px 0;">
+        <span style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 600;">Available Categories</span>
+        <div style="display: flex; gap: 10px;">
+          <button type="button" class="category-toggle-link" id="exportSelectAllBtn">Select All</button>
+          <span style="color: var(--border-color);">|</span>
+          <button type="button" class="category-toggle-link" id="exportDeselectAllBtn">Deselect All</button>
+        </div>
+      </div>
+
+      <!-- Categories Checkbox Grid -->
+      <div class="category-checkbox-grid">
+        <label class="category-checkbox-card" for="exportCatEntireData">
+          <input type="checkbox" id="exportCatEntireData" value="entire_data" checked>
+          <div class="category-card-content">
+            <span class="category-card-title">🌐 Entire Data</span>
+            <span class="category-card-desc">Full backup: profile, settings, all habits, history & stats</span>
+          </div>
+        </label>
+
+        <label class="category-checkbox-card" for="exportCatEntireHabits">
+          <input type="checkbox" id="exportCatEntireHabits" value="entire_habits">
+          <div class="category-card-content">
+            <span class="category-card-title">📋 Entire Habits</span>
+            <span class="category-card-desc">All habit categories & completion history (no settings)</span>
+          </div>
+        </label>
+
+        <div class="category-divider-line"><span>Individual Categories</span></div>
+
+        <div class="category-sub-grid">
+          <label class="category-checkbox-pill" for="exportCatDiet">
+            <input type="checkbox" id="exportCatDiet" value="diet">
+            <span>🥗 Diet</span>
+          </label>
+          <label class="category-checkbox-pill" for="exportCatRoutine">
+            <input type="checkbox" id="exportCatRoutine" value="routine">
+            <span>📅 Routine</span>
+          </label>
+          <label class="category-checkbox-pill" for="exportCatSkincare">
+            <input type="checkbox" id="exportCatSkincare" value="skincare">
+            <span>🧴 Skin Care</span>
+          </label>
+          <label class="category-checkbox-pill" for="exportCatHaircare">
+            <input type="checkbox" id="exportCatHaircare" value="haircare">
+            <span>💇 Hair Care</span>
+          </label>
+          <label class="category-checkbox-pill" for="exportCatOthers">
+            <input type="checkbox" id="exportCatOthers" value="others">
+            <span>📦 Others</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Dynamic Export Summary -->
+      <div id="exportSummaryBox" class="backup-summary-box">
+        <i class="fa-solid fa-circle-info"></i>
+        <span id="exportSummaryText">Ready to export: Entire application backup.</span>
+      </div>
+
+      <!-- Fallback Raw JSON Display -->
+      <div id="exportFallbackArea" style="display: none; margin-top: 12px;">
+        <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Manual Copy JSON Text:</label>
+        <textarea id="exportFallbackTextarea" readonly class="settings-textarea" style="width: 100%; height: 90px; font-size: 0.75rem; font-family: monospace;"></textarea>
+      </div>
+
+      <!-- Modal Actions -->
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+        <button class="settings-btn" id="cancelExportBtn" style="padding: 10px 16px;">Cancel</button>
+        <button class="settings-btn" id="copyExportJsonBtn" style="padding: 10px 16px;">
+          <i class="fa-regular fa-copy"></i> Copy JSON
+        </button>
+        <button class="settings-btn btn-primary" id="confirmExportBtn" style="padding: 10px 18px;">
+          <i class="fa-solid fa-download"></i> Export JSON
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import Data Modal (Upload Data) -->
+  <div id="importDataModal" class="history-modal-backdrop" role="dialog" aria-modal="true" style="width: 100vw; display: none; justify-content: center; z-index: 99999;">
+    <div class="history-modal-content backup-modal-content" style="max-width: 540px; text-align: left; padding: 28px 24px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(34, 197, 94, 0.15); display: flex; align-items: center; justify-content: center; color: #22C55E;">
+            <i class="fa-solid fa-cloud-arrow-up" style="font-size: 1.1rem;"></i>
+          </div>
+          <div>
+            <h2 style="font-size: 1.25rem; font-weight: 700; color: #FFF; margin: 0;">Import Your Data</h2>
+            <p style="color: var(--text-muted); font-size: 0.8rem; margin: 2px 0 0 0;">Select categories and upload your backup file.</p>
+          </div>
+        </div>
+        <button class="modal-close-icon-btn" id="closeImportModalBtn" aria-label="Close import dialog">&times;</button>
+      </div>
+
+      <!-- Select / Deselect All Controls -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 4px 0;">
+        <span style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 600;">Target Categories to Import</span>
+        <div style="display: flex; gap: 10px;">
+          <button type="button" class="category-toggle-link" id="importSelectAllBtn">Select All</button>
+          <span style="color: var(--border-color);">|</span>
+          <button type="button" class="category-toggle-link" id="importDeselectAllBtn">Deselect All</button>
+        </div>
+      </div>
+
+      <!-- Categories Checkbox Grid -->
+      <div class="category-checkbox-grid">
+        <label class="category-checkbox-card" for="importCatEntireData">
+          <input type="checkbox" id="importCatEntireData" value="entire_data" checked>
+          <div class="category-card-content">
+            <span class="category-card-title">🌐 Entire Data</span>
+            <span class="category-card-desc">Restore all profile, settings, habits, history & statistics</span>
+          </div>
+        </label>
+
+        <label class="category-checkbox-card" for="importCatEntireHabits">
+          <input type="checkbox" id="importCatEntireHabits" value="entire_habits">
+          <div class="category-card-content">
+            <span class="category-card-title">📋 Entire Habits</span>
+            <span class="category-card-desc">Import all habit categories without overwriting user settings</span>
+          </div>
+        </label>
+
+        <div class="category-divider-line"><span>Individual Categories</span></div>
+
+        <div class="category-sub-grid">
+          <label class="category-checkbox-pill" for="importCatDiet">
+            <input type="checkbox" id="importCatDiet" value="diet">
+            <span>🥗 Diet</span>
+          </label>
+          <label class="category-checkbox-pill" for="importCatRoutine">
+            <input type="checkbox" id="importCatRoutine" value="routine">
+            <span>📅 Routine</span>
+          </label>
+          <label class="category-checkbox-pill" for="importCatSkincare">
+            <input type="checkbox" id="importCatSkincare" value="skincare">
+            <span>🧴 Skin Care</span>
+          </label>
+          <label class="category-checkbox-pill" for="importCatHaircare">
+            <input type="checkbox" id="importCatHaircare" value="haircare">
+            <span>💇 Hair Care</span>
+          </label>
+          <label class="category-checkbox-pill" for="importCatOthers">
+            <input type="checkbox" id="importCatOthers" value="others">
+            <span>📦 Others</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- File Upload Box -->
+      <div style="margin-top: 16px;">
+        <input type="file" id="backupJsonFileInput" accept=".json,application/json" style="display: none;">
+        
+        <div id="fileUploadDropzone" class="file-upload-dropzone">
+          <i class="fa-solid fa-file-arrow-up" style="font-size: 1.8rem; color: var(--accent); margin-bottom: 8px;"></i>
+          <p style="font-size: 0.9rem; font-weight: 600; color: #FFF; margin: 0 0 4px 0;">Click to select backup JSON file</p>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Supports .json exported files</span>
+          <div id="selectedFileBadge" class="selected-file-badge" style="display: none;"></div>
+        </div>
+      </div>
+
+      <!-- Fallback Paste JSON Section -->
+      <div style="margin-top: 10px;">
+        <button type="button" id="togglePasteJsonBtn" class="category-toggle-link" style="font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
+          <i class="fa-solid fa-chevron-right" id="pasteToggleIcon" style="transition: transform 0.2s;"></i>
+          <span>Or Paste JSON Text</span>
+        </button>
+        
+        <div id="pasteJsonContainer" style="display: none; margin-top: 8px;">
+          <textarea id="importPasteTextarea" class="settings-textarea" placeholder="Paste your backup JSON text here..." style="width: 100%; height: 90px; font-size: 0.75rem; font-family: monospace;"></textarea>
+        </div>
+      </div>
+
+      <!-- Validation / Preview Summary Box -->
+      <div id="importPreviewBox" class="backup-summary-box" style="margin-top: 14px; display: none;">
+        <i class="fa-solid fa-circle-check" id="importPreviewIcon"></i>
+        <div id="importPreviewContent" style="font-size: 0.8rem;"></div>
+      </div>
+
+      <!-- Modal Actions -->
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+        <button class="settings-btn" id="cancelImportBtn" style="padding: 10px 16px;">Cancel</button>
+        <button class="settings-btn btn-primary" id="confirmImportBtn" disabled style="padding: 10px 18px; opacity: 0.6; cursor: not-allowed;">
+          <i class="fa-solid fa-file-import"></i> Import Data
+        </button>
       </div>
     </div>
   </div>

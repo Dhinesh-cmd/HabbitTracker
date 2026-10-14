@@ -43,7 +43,11 @@ class SettingsPageController {
       soundsToggleInput: document.getElementById('soundsToggleInput'),
       themeToggleSwitch: document.getElementById('themeToggleSwitch'),
 
-      // JSON backups
+      // Data Backup & Restore buttons
+      uploadDataBtn: document.getElementById('uploadDataBtn'),
+      downloadDataBtn: document.getElementById('downloadDataBtn'),
+
+      // Legacy JSON backups
       importJsonFileInput: document.getElementById('importJsonFileInput'),
       importJsonBtn: document.getElementById('importJsonBtn'),
       exportJsonBtn: document.getElementById('exportJsonBtn'),
@@ -57,6 +61,42 @@ class SettingsPageController {
       resetTodayBtn: document.getElementById('resetTodayBtn'),
       clearAllHistoryBtn: document.getElementById('clearAllHistoryBtn'),
 
+      // Clear Habits Danger Zone
+      clearHabitsBtn: document.getElementById('clearHabitsBtn'),
+      clearHabitsConfirmModal: document.getElementById('clearHabitsConfirmModal'),
+      cancelClearHabitsBtn: document.getElementById('cancelClearHabitsBtn'),
+      confirmClearHabitsBtn: document.getElementById('confirmClearHabitsBtn'),
+
+      // Export Modal
+      exportDataModal: document.getElementById('exportDataModal'),
+      closeExportModalBtn: document.getElementById('closeExportModalBtn'),
+      cancelExportBtn: document.getElementById('cancelExportBtn'),
+      exportSelectAllBtn: document.getElementById('exportSelectAllBtn'),
+      exportDeselectAllBtn: document.getElementById('exportDeselectAllBtn'),
+      confirmExportBtn: document.getElementById('confirmExportBtn'),
+      copyExportJsonBtn: document.getElementById('copyExportJsonBtn'),
+      exportSummaryText: document.getElementById('exportSummaryText'),
+      exportFallbackArea: document.getElementById('exportFallbackArea'),
+      exportFallbackTextarea: document.getElementById('exportFallbackTextarea'),
+
+      // Import Modal
+      importDataModal: document.getElementById('importDataModal'),
+      closeImportModalBtn: document.getElementById('closeImportModalBtn'),
+      cancelImportBtn: document.getElementById('cancelImportBtn'),
+      importSelectAllBtn: document.getElementById('importSelectAllBtn'),
+      importDeselectAllBtn: document.getElementById('importDeselectAllBtn'),
+      backupJsonFileInput: document.getElementById('backupJsonFileInput'),
+      fileUploadDropzone: document.getElementById('fileUploadDropzone'),
+      selectedFileBadge: document.getElementById('selectedFileBadge'),
+      togglePasteJsonBtn: document.getElementById('togglePasteJsonBtn'),
+      pasteToggleIcon: document.getElementById('pasteToggleIcon'),
+      pasteJsonContainer: document.getElementById('pasteJsonContainer'),
+      importPasteTextarea: document.getElementById('importPasteTextarea'),
+      importPreviewBox: document.getElementById('importPreviewBox'),
+      importPreviewIcon: document.getElementById('importPreviewIcon'),
+      importPreviewContent: document.getElementById('importPreviewContent'),
+      confirmImportBtn: document.getElementById('confirmImportBtn'),
+
       // Modals
       wipeDatabaseConfirmModal: document.getElementById('wipeDatabaseConfirmModal'),
       cancelWipeBtn: document.getElementById('cancelWipeBtn'),
@@ -67,6 +107,8 @@ class SettingsPageController {
       confirmClearHistoryBtn: document.getElementById('confirmClearHistoryBtn'),
       notificationContainer: document.getElementById('notificationContainer')
     };
+
+    this.uploadedBackupData = null;
 
     this.init();
   }
@@ -377,71 +419,536 @@ class SettingsPageController {
       });
     }
 
-    // Global Key Listener for modal close
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        closeWipeModal();
-        closeClearHistoryModal();
+    // --- Modal Open/Close Transitions ---
+    const openModal = (modalEl) => {
+      if (!modalEl) return;
+      modalEl.style.display = 'flex';
+      document.body.classList.add('modal-open');
+      requestAnimationFrame(() => {
+        modalEl.classList.add('active');
+      });
+    };
+
+    const closeModal = (modalEl) => {
+      if (!modalEl) return;
+      modalEl.classList.remove('active');
+      document.body.classList.remove('modal-open');
+      setTimeout(() => {
+        modalEl.style.display = 'none';
+      }, 250);
+    };
+
+    // Close on click outside backdrop
+    [
+      this.dom.wipeDatabaseConfirmModal,
+      this.dom.clearHistoryConfirmModal,
+      this.dom.clearHabitsConfirmModal,
+      this.dom.exportDataModal,
+      this.dom.importDataModal
+    ].forEach(modalEl => {
+      if (modalEl) {
+        modalEl.addEventListener('click', (e) => {
+          if (e.target === modalEl) closeModal(modalEl);
+        });
       }
     });
 
-    // Export JSON
-    if (this.dom.exportJsonBtn) {
-      this.dom.exportJsonBtn.addEventListener('click', () => {
+    // Global Key Listener for modal close on Escape
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeModal(this.dom.wipeDatabaseConfirmModal);
+        closeModal(this.dom.clearHistoryConfirmModal);
+        closeModal(this.dom.clearHabitsConfirmModal);
+        closeModal(this.dom.exportDataModal);
+        closeModal(this.dom.importDataModal);
+      }
+    });
+
+    // --- Clear Habits Feature ---
+    if (this.dom.clearHabitsBtn) {
+      this.dom.clearHabitsBtn.addEventListener('click', () => {
+        openModal(this.dom.clearHabitsConfirmModal);
+      });
+    }
+
+    if (this.dom.cancelClearHabitsBtn) {
+      this.dom.cancelClearHabitsBtn.addEventListener('click', () => {
+        closeModal(this.dom.clearHabitsConfirmModal);
+      });
+    }
+
+    if (this.dom.confirmClearHabitsBtn) {
+      this.dom.confirmClearHabitsBtn.addEventListener('click', async () => {
+        this.dom.confirmClearHabitsBtn.disabled = true;
+        this.dom.confirmClearHabitsBtn.innerText = "Clearing Habits...";
+        if (this.dom.cancelClearHabitsBtn) this.dom.cancelClearHabitsBtn.disabled = true;
+
+        console.group("%c🗑️ Clear All Habits Executed", "color: #ef4444; font-weight: bold;");
         try {
-          const data = StorageManager.exportData();
-          const blob = new Blob([data], { type: 'application/json' });
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = `HabitTracker_DatabaseBackup_${this.todayStr}.json`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          this.showLocalToast("Export Successful", "Database backup file downloaded.", "success");
+          if (this.dom.loadingOverlay) {
+            this.dom.loadingOverlay.classList.remove('fade-out');
+          }
+
+          const success = StorageManager.clearAllHabits();
+          if (success) {
+            playSuccessChime();
+            this.showLocalToast("Habits Cleared", "All habits and completion history have been removed. Profile and settings preserved.", "success");
+            console.info("All habits and habit-related history records cleared successfully.");
+            setTimeout(() => {
+              window.location.reload();
+            }, 1000);
+          } else {
+            throw new Error("Unable to clear habits.");
+          }
         } catch (err) {
-          this.showLocalToast("Export Failed", "Error creating backup file.", "warning");
+          console.error("Error clearing habits:", err);
+          this.showLocalToast("Action Failed", "Could not clear habits. Existing data preserved.", "danger");
+          this.dom.confirmClearHabitsBtn.disabled = false;
+          this.dom.confirmClearHabitsBtn.innerText = "Clear All Habits";
+          if (this.dom.cancelClearHabitsBtn) this.dom.cancelClearHabitsBtn.disabled = false;
+          if (this.dom.loadingOverlay) {
+            this.dom.loadingOverlay.classList.add('fade-out');
+          }
+        } finally {
+          console.groupEnd();
         }
       });
     }
 
-    // Import JSON File Picker
-    if (this.dom.importJsonBtn) {
-      this.dom.importJsonBtn.addEventListener('click', () => {
-        this.dom.importJsonFileInput.click();
+    // --- Category Checkbox Helper Logic (Export & Import) ---
+    const setupCategoryInteractions = (prefix, onSelectionChange) => {
+      const entireDataCb = document.getElementById(`${prefix}CatEntireData`);
+      const entireHabitsCb = document.getElementById(`${prefix}CatEntireHabits`);
+      const habitCats = ['diet', 'routine', 'skincare', 'haircare', 'others'];
+      const habitCbs = habitCats.map(c => document.getElementById(`${prefix}Cat${c.charAt(0).toUpperCase() + c.slice(1)}`)).filter(Boolean);
+
+      const selectAllBtn = document.getElementById(`${prefix}SelectAllBtn`);
+      const deselectAllBtn = document.getElementById(`${prefix}DeselectAllBtn`);
+
+      if (entireDataCb) {
+        entireDataCb.addEventListener('change', () => {
+          const checked = entireDataCb.checked;
+          if (entireHabitsCb) entireHabitsCb.checked = checked;
+          habitCbs.forEach(cb => cb.checked = checked);
+          if (onSelectionChange) onSelectionChange();
+        });
+      }
+
+      if (entireHabitsCb) {
+        entireHabitsCb.addEventListener('change', () => {
+          const checked = entireHabitsCb.checked;
+          habitCbs.forEach(cb => cb.checked = checked);
+          if (!checked && entireDataCb) entireDataCb.checked = false;
+          if (onSelectionChange) onSelectionChange();
+        });
+      }
+
+      habitCbs.forEach(cb => {
+        cb.addEventListener('change', () => {
+          const allHabitsChecked = habitCbs.every(c => c.checked);
+          if (entireHabitsCb) {
+            entireHabitsCb.checked = allHabitsChecked;
+          }
+          if (!cb.checked && entireDataCb) {
+            entireDataCb.checked = false;
+          }
+          if (onSelectionChange) onSelectionChange();
+        });
+      });
+
+      if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', () => {
+          if (entireDataCb) entireDataCb.checked = true;
+          if (entireHabitsCb) entireHabitsCb.checked = true;
+          habitCbs.forEach(cb => cb.checked = true);
+          if (onSelectionChange) onSelectionChange();
+        });
+      }
+
+      if (deselectAllBtn) {
+        deselectAllBtn.addEventListener('click', () => {
+          if (entireDataCb) entireDataCb.checked = false;
+          if (entireHabitsCb) entireHabitsCb.checked = false;
+          habitCbs.forEach(cb => cb.checked = false);
+          if (onSelectionChange) onSelectionChange();
+        });
+      }
+    };
+
+    const getSelectedCategories = (prefix) => {
+      const entireData = document.getElementById(`${prefix}CatEntireData`)?.checked;
+      if (entireData) return ['entire_data'];
+
+      const entireHabits = document.getElementById(`${prefix}CatEntireHabits`)?.checked;
+      const habitCats = ['diet', 'routine', 'skincare', 'haircare', 'others'];
+      const selected = [];
+      habitCats.forEach(c => {
+        const cb = document.getElementById(`${prefix}Cat${c.charAt(0).toUpperCase() + c.slice(1)}`);
+        if (cb && cb.checked) selected.push(c);
+      });
+
+      if (entireHabits && selected.length === 5) return ['entire_habits'];
+      if (entireHabits) return ['entire_habits', ...selected];
+      return selected;
+    };
+
+    // --- Download Data (Export Modal) ---
+    const updateExportSummary = () => {
+      const selected = getSelectedCategories('export');
+      const hasSelection = selected.length > 0;
+
+      if (this.dom.confirmExportBtn) this.dom.confirmExportBtn.disabled = !hasSelection;
+      if (this.dom.copyExportJsonBtn) this.dom.copyExportJsonBtn.disabled = !hasSelection;
+
+      if (!hasSelection) {
+        if (this.dom.exportSummaryText) {
+          this.dom.exportSummaryText.textContent = "Please select at least one category to export.";
+        }
+        return;
+      }
+
+      if (selected.includes('entire_data')) {
+        if (this.dom.exportSummaryText) {
+          this.dom.exportSummaryText.textContent = "Ready to export: Entire application backup (profile, settings, habits, history, statistics).";
+        }
+      } else if (selected.includes('entire_habits')) {
+        if (this.dom.exportSummaryText) {
+          this.dom.exportSummaryText.textContent = "Ready to export: All habits and completion history across all categories.";
+        }
+      } else {
+        const catLabels = { diet: "Diet", routine: "Routine", skincare: "Skin Care", haircare: "Hair Care", others: "Others" };
+        const catNames = selected.map(c => catLabels[c] || c);
+        if (this.dom.exportSummaryText) {
+          this.dom.exportSummaryText.textContent = `Ready to export: Habits and history for ${catNames.join(', ')}.`;
+        }
+      }
+    };
+
+    setupCategoryInteractions('export', updateExportSummary);
+
+    if (this.dom.downloadDataBtn) {
+      this.dom.downloadDataBtn.addEventListener('click', () => {
+        const entireDataCb = document.getElementById('exportCatEntireData');
+        if (entireDataCb) {
+          entireDataCb.checked = true;
+          entireDataCb.dispatchEvent(new Event('change'));
+        }
+        if (this.dom.exportFallbackArea) this.dom.exportFallbackArea.style.display = 'none';
+        updateExportSummary();
+        openModal(this.dom.exportDataModal);
       });
     }
 
-    if (this.dom.importJsonFileInput) {
-      this.dom.importJsonFileInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+    if (this.dom.closeExportModalBtn) {
+      this.dom.closeExportModalBtn.addEventListener('click', () => closeModal(this.dom.exportDataModal));
+    }
+    if (this.dom.cancelExportBtn) {
+      this.dom.cancelExportBtn.addEventListener('click', () => closeModal(this.dom.exportDataModal));
+    }
 
+    // Descriptive filename generator
+    const getExportFilename = (selected) => {
+      if (selected.includes('entire_data')) {
+        return `habit-tracker-full-backup-${this.todayStr}.json`;
+      } else if (selected.includes('entire_habits')) {
+        return `habit-tracker-habits-backup-${this.todayStr}.json`;
+      } else if (selected.length === 1) {
+        return `habit-tracker-${selected[0]}-backup-${this.todayStr}.json`;
+      } else {
+        return `habit-tracker-selected-categories-backup-${this.todayStr}.json`;
+      }
+    };
+
+    // Download JSON via Blob API
+    if (this.dom.confirmExportBtn) {
+      this.dom.confirmExportBtn.addEventListener('click', () => {
+        const selected = getSelectedCategories('export');
+        if (selected.length === 0) return;
+
+        try {
+          const backupObj = StorageManager.generateBackup(selected);
+          const jsonString = JSON.stringify(backupObj, null, 2);
+          const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const filename = getExportFilename(selected);
+
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+
+          this.showLocalToast("Export Successful", `Downloaded backup file: ${filename}`, "success");
+          closeModal(this.dom.exportDataModal);
+        } catch (err) {
+          console.error("Export error:", err);
+          this.showLocalToast("Export Failed", "An error occurred while generating backup.", "danger");
+        }
+      });
+    }
+
+    // Copy JSON to clipboard
+    if (this.dom.copyExportJsonBtn) {
+      this.dom.copyExportJsonBtn.addEventListener('click', async () => {
+        const selected = getSelectedCategories('export');
+        if (selected.length === 0) return;
+
+        try {
+          const backupObj = StorageManager.generateBackup(selected);
+          const jsonString = JSON.stringify(backupObj, null, 2);
+
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(jsonString);
+            this.showLocalToast("Copied to Clipboard", "Backup JSON payload copied successfully.", "success");
+          } else {
+            throw new Error("Clipboard API not available");
+          }
+        } catch (err) {
+          console.warn("Clipboard access issue, showing fallback:", err);
+          if (this.dom.exportFallbackArea && this.dom.exportFallbackTextarea) {
+            const backupObj = StorageManager.generateBackup(selected);
+            this.dom.exportFallbackTextarea.value = JSON.stringify(backupObj, null, 2);
+            this.dom.exportFallbackArea.style.display = 'block';
+            this.dom.exportFallbackTextarea.select();
+            this.showLocalToast("Manual Copy Required", "Please copy the JSON text from the box below.", "warning");
+          }
+        }
+      });
+    }
+
+    // --- Upload Data (Import Modal) ---
+    const updateImportValidation = () => {
+      if (!this.uploadedBackupData) {
+        if (this.dom.importPreviewBox) this.dom.importPreviewBox.style.display = 'none';
+        if (this.dom.confirmImportBtn) {
+          this.dom.confirmImportBtn.disabled = true;
+          this.dom.confirmImportBtn.style.opacity = '0.6';
+          this.dom.confirmImportBtn.style.cursor = 'not-allowed';
+        }
+        return;
+      }
+
+      const selected = getSelectedCategories('import');
+      if (selected.length === 0) {
+        if (this.dom.importPreviewBox) {
+          this.dom.importPreviewBox.style.display = 'flex';
+          this.dom.importPreviewBox.className = 'backup-summary-box error';
+          if (this.dom.importPreviewIcon) this.dom.importPreviewIcon.className = 'fa-solid fa-triangle-exclamation';
+          if (this.dom.importPreviewContent) {
+            this.dom.importPreviewContent.innerHTML = '<strong>No category selected.</strong> Please select at least one category to import.';
+          }
+        }
+        if (this.dom.confirmImportBtn) {
+          this.dom.confirmImportBtn.disabled = true;
+          this.dom.confirmImportBtn.style.opacity = '0.6';
+          this.dom.confirmImportBtn.style.cursor = 'not-allowed';
+        }
+        return;
+      }
+
+      const validation = StorageManager.validateBackup(this.uploadedBackupData, selected);
+      if (this.dom.importPreviewBox) {
+        this.dom.importPreviewBox.style.display = 'flex';
+        if (validation.valid) {
+          this.dom.importPreviewBox.className = 'backup-summary-box success';
+          if (this.dom.importPreviewIcon) this.dom.importPreviewIcon.className = 'fa-solid fa-circle-check';
+          const { habitCount, historyDays, categoriesFound, hasProfile, hasSettings } = validation.summary;
+          let details = `<strong>Backup Validated:</strong> ${habitCount} matching habit${habitCount === 1 ? '' : 's'} across ${categoriesFound.length > 0 ? categoriesFound.join(', ') : 'selected categories'}. History: ${historyDays} day${historyDays === 1 ? '' : 's'}.`;
+          if (hasProfile) details += ` Profile data detected.`;
+          if (hasSettings) details += ` Settings detected.`;
+          if (this.dom.importPreviewContent) {
+            this.dom.importPreviewContent.innerHTML = details;
+          }
+
+          if (this.dom.confirmImportBtn) {
+            this.dom.confirmImportBtn.disabled = false;
+            this.dom.confirmImportBtn.style.opacity = '1';
+            this.dom.confirmImportBtn.style.cursor = 'pointer';
+          }
+        } else {
+          this.dom.importPreviewBox.className = 'backup-summary-box error';
+          if (this.dom.importPreviewIcon) this.dom.importPreviewIcon.className = 'fa-solid fa-circle-xmark';
+          if (this.dom.importPreviewContent) {
+            this.dom.importPreviewContent.innerHTML = `<strong>Validation Failed:</strong> ${validation.error}`;
+          }
+
+          if (this.dom.confirmImportBtn) {
+            this.dom.confirmImportBtn.disabled = true;
+            this.dom.confirmImportBtn.style.opacity = '0.6';
+            this.dom.confirmImportBtn.style.cursor = 'not-allowed';
+          }
+        }
+      }
+    };
+
+    setupCategoryInteractions('import', updateImportValidation);
+
+    if (this.dom.uploadDataBtn) {
+      this.dom.uploadDataBtn.addEventListener('click', () => {
+        const entireDataCb = document.getElementById('importCatEntireData');
+        if (entireDataCb) {
+          entireDataCb.checked = true;
+          entireDataCb.dispatchEvent(new Event('change'));
+        }
+        this.uploadedBackupData = null;
+        if (this.dom.backupJsonFileInput) this.dom.backupJsonFileInput.value = '';
+        if (this.dom.selectedFileBadge) {
+          this.dom.selectedFileBadge.style.display = 'none';
+          this.dom.selectedFileBadge.innerHTML = '';
+        }
+        if (this.dom.importPasteTextarea) this.dom.importPasteTextarea.value = '';
+        if (this.dom.pasteJsonContainer) this.dom.pasteJsonContainer.style.display = 'none';
+        if (this.dom.pasteToggleIcon) this.dom.pasteToggleIcon.style.transform = 'rotate(0deg)';
+        updateImportValidation();
+        openModal(this.dom.importDataModal);
+      });
+    }
+
+    if (this.dom.closeImportModalBtn) {
+      this.dom.closeImportModalBtn.addEventListener('click', () => closeModal(this.dom.importDataModal));
+    }
+    if (this.dom.cancelImportBtn) {
+      this.dom.cancelImportBtn.addEventListener('click', () => closeModal(this.dom.importDataModal));
+    }
+
+    // Dropzone click -> file input
+    if (this.dom.fileUploadDropzone && this.dom.backupJsonFileInput) {
+      this.dom.fileUploadDropzone.addEventListener('click', () => {
+        this.dom.backupJsonFileInput.click();
+      });
+
+      this.dom.fileUploadDropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        this.dom.fileUploadDropzone.classList.add('drag-over');
+      });
+
+      this.dom.fileUploadDropzone.addEventListener('dragleave', () => {
+        this.dom.fileUploadDropzone.classList.remove('drag-over');
+      });
+
+      this.dom.fileUploadDropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        this.dom.fileUploadDropzone.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file) handleFileImport(file);
+      });
+    }
+
+    const handleFileImport = (file) => {
+      if (!file) return;
+      if (!file.name.toLowerCase().endsWith('.json') && file.type !== 'application/json') {
+        this.showLocalToast("Invalid File Type", "Please select a valid .json backup file.", "warning");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        this.uploadedBackupData = event.target.result;
+        if (this.dom.selectedFileBadge) {
+          const sizeKb = (file.size / 1024).toFixed(1);
+          this.dom.selectedFileBadge.innerHTML = `<i class="fa-solid fa-file-code"></i> ${file.name} (${sizeKb} KB) <i class="fa-solid fa-check" style="color: #22C55E; margin-left: 4px;"></i>`;
+          this.dom.selectedFileBadge.style.display = 'inline-flex';
+        }
+        updateImportValidation();
+      };
+      reader.onerror = () => {
+        this.showLocalToast("Read Error", "Could not read selected file.", "danger");
+      };
+      reader.readAsText(file);
+    };
+
+    if (this.dom.backupJsonFileInput) {
+      this.dom.backupJsonFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) handleFileImport(file);
+      });
+    }
+
+    // Toggle Paste JSON section
+    if (this.dom.togglePasteJsonBtn && this.dom.pasteJsonContainer) {
+      this.dom.togglePasteJsonBtn.addEventListener('click', () => {
+        const isHidden = this.dom.pasteJsonContainer.style.display === 'none';
+        this.dom.pasteJsonContainer.style.display = isHidden ? 'block' : 'none';
+        if (this.dom.pasteToggleIcon) {
+          this.dom.pasteToggleIcon.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
+        }
+      });
+    }
+
+    if (this.dom.importPasteTextarea) {
+      this.dom.importPasteTextarea.addEventListener('input', () => {
+        const val = this.dom.importPasteTextarea.value.trim();
+        if (val) {
+          this.uploadedBackupData = val;
+          if (this.dom.selectedFileBadge) {
+            this.dom.selectedFileBadge.style.display = 'none';
+          }
+        } else {
+          this.uploadedBackupData = null;
+        }
+        updateImportValidation();
+      });
+    }
+
+    // Execute Import with Confirmation & Safe Rollback
+    if (this.dom.confirmImportBtn) {
+      this.dom.confirmImportBtn.addEventListener('click', async () => {
+        if (!this.uploadedBackupData) return;
+        const selected = getSelectedCategories('import');
+        if (selected.length === 0) return;
+
+        // Immediate pre-import validation to prevent state mismatch or category mismatch
+        const preValidation = StorageManager.validateBackup(this.uploadedBackupData, selected);
+        if (!preValidation.valid) {
+          updateImportValidation();
+          this.showLocalToast("Category Mismatch", preValidation.error, "danger");
+          return;
+        }
+
+        const confirmed = await CustomDialog.confirm(
+          "Import Data",
+          "Are you sure you want to restore this backup? Existing data for the selected categories will be updated.",
+          true
+        );
+        if (!confirmed) return;
+
+        this.dom.confirmImportBtn.disabled = true;
+        this.dom.confirmImportBtn.innerText = "Importing...";
         if (this.dom.loadingOverlay) {
           this.dom.loadingOverlay.classList.remove('fade-out');
         }
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const text = event.target.result;
-          const success = StorageManager.importData(text);
-          
-          setTimeout(() => {
-            if (success) {
+        setTimeout(() => {
+          try {
+            const res = StorageManager.restoreBackup(this.uploadedBackupData, selected);
+            if (res.success) {
               playSuccessChime();
-              this.showLocalToast("Restore Complete", "Data imported successfully. Reloading workspace...", "success");
+              const catDisplay = res.restoredCategories && res.restoredCategories.length > 0 
+                ? res.restoredCategories.join(', ')
+                : 'selected categories';
+              this.showLocalToast(
+                "Restore Complete",
+                `Successfully restored ${res.importedHabitCount} habits across ${catDisplay} and ${res.historyDaysCount} history records.`,
+                "success"
+              );
               setTimeout(() => {
                 window.location.reload();
-              }, 1000);
+              }, 1200);
             } else {
-              this.showLocalToast("Restore Failed", "Invalid backup file or corrupted format.", "warning");
-              if (this.dom.loadingOverlay) {
-                this.dom.loadingOverlay.classList.add('fade-out');
-              }
+              throw new Error(res.error || "Import failed.");
             }
-          }, 500);
-        };
-        reader.readAsText(file);
+          } catch (err) {
+            console.error("Backup restoration failed:", err);
+            this.showLocalToast("Restore Failed", `${err.message}. Previous data has been safely kept.`, "danger");
+            this.dom.confirmImportBtn.disabled = false;
+            this.dom.confirmImportBtn.innerHTML = '<i class="fa-solid fa-file-import"></i> Import Data';
+            if (this.dom.loadingOverlay) {
+              this.dom.loadingOverlay.classList.add('fade-out');
+            }
+          }
+        }, 300);
       });
     }
 

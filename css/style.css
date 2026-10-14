@@ -2958,18 +2958,20 @@ h6 {
 }
 
 .category-pills-selector {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 4px;
 }
 
 .category-pill-btn {
+  flex: 1 1 calc(33.333% - 8px);
+  min-width: 90px;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--border-color);
   border-radius: 12px;
   color: var(--text-secondary);
-  padding: 12px 6px;
+  padding: 12px 8px;
   font-family: inherit;
   font-weight: 600;
   font-size: 0.85rem;
@@ -2982,29 +2984,22 @@ h6 {
 }
 
 .category-pill-btn:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.05);
   color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
-.category-pill-btn[data-category="diet"].active {
-  background: rgba(59, 130, 246, 0.12);
-  color: #60A5FA;
-  border-color: #3B82F6;
-  box-shadow: 0 0 15px rgba(59, 130, 246, 0.15);
-}
-
-.category-pill-btn[data-category="skincare"].active {
-  background: rgba(236, 72, 153, 0.12);
-  color: #F472B6;
-  border-color: #EC4899;
-  box-shadow: 0 0 15px rgba(236, 72, 153, 0.15);
-}
-
-.category-pill-btn[data-category="haircare"].active {
-  background: rgba(168, 85, 247, 0.12);
-  color: #C084FC;
-  border-color: #A855F7;
-  box-shadow: 0 0 15px rgba(168, 85, 247, 0.15);
+/* Universal selected category styling: blue border, blue-tinted background, highlighted text & glow */
+.category-pill-btn.active,
+.category-pill-btn[data-category="diet"].active,
+.category-pill-btn[data-category="skincare"].active,
+.category-pill-btn[data-category="haircare"].active,
+.category-pill-btn[data-category="routine"].active,
+.category-pill-btn[data-category="others"].active {
+  background: rgba(59, 130, 246, 0.15) !important;
+  color: #60A5FA !important;
+  border-color: #3B82F6 !important;
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.25) !important;
 }
 
 /* Time Picker Wrapper */
@@ -3039,50 +3034,115 @@ h6 {
   box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.15);
 }
 
-/* Editor Habits list */
+/* Editor Habits list - Clean scrollable container */
 .editor-habits-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 200px;
+  max-height: 220px;
   overflow-y: auto;
-  padding-right: 4px;
+  padding: 4px 6px 4px 2px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.editor-habits-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.editor-habits-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
 }
 
 .editor-habit-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(255, 255, 255, 0.01);
+  background: rgba(255, 255, 255, 0.025);
   border: 1px solid var(--border-color);
   border-radius: 12px;
-  padding: 8px 12px;
-  gap: 8px;
+  padding: 10px 14px;
+  gap: 12px;
+  transition: all var(--transition-fast);
   animation: slideIn var(--transition-fast);
 }
 
+.editor-habit-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
 @keyframes slideIn {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+.editor-habit-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
 }
 
 .editor-habit-name {
   font-size: 0.9rem;
+  font-weight: 500;
   color: var(--text-primary);
-  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-habit-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+}
+
+.editor-habit-time-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #60A5FA;
+  background: rgba(59, 130, 246, 0.12);
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.editor-habit-cat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 7px;
+  border-radius: 4px;
+  text-transform: capitalize;
 }
 
 .delete-habit-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #EF4444;
+  border-radius: 8px;
   cursor: pointer;
-  transition: color var(--transition-fast);
-  padding: 4px;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
 }
 
 .delete-habit-btn:hover {
-  color: var(--danger);
+  background: rgba(239, 68, 68, 0.25);
+  color: #FFFFFF;
+  border-color: #EF4444;
 }
 
 /* Quick Add Habit Row inside Modal */

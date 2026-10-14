@@ -741,9 +741,32 @@ class HabitTrackerApp {
     });
 
     // Determine which categories to render based on the current filter
-    let categoriesToRender = CATEGORIES.map(c => c.id);
+    let categoriesToRender = [];
     if (this.activeFilter !== 'all') {
       categoriesToRender = [this.activeFilter];
+    } else {
+      // Partition categories: sections containing habits appear first,
+      // sections with no habits scheduled appear at the bottom,
+      // preserving the existing category order within both groups.
+      const populatedCategories = [];
+      const emptyCategories = [];
+
+      const allCategoryIds = [
+        ...CATEGORIES.map(c => c.id),
+        ...Object.keys(categoryGroups).filter(catId => !CATEGORIES.some(c => c.id === catId))
+      ];
+
+      allCategoryIds.forEach(catId => {
+        const catData = categoryGroups[catId];
+        const hasHabits = catData && catData.periods && Object.keys(catData.periods).length > 0;
+        if (hasHabits) {
+          populatedCategories.push(catId);
+        } else {
+          emptyCategories.push(catId);
+        }
+      });
+
+      categoriesToRender = [...populatedCategories, ...emptyCategories];
     }
 
     categoriesToRender.forEach(cat => {
@@ -1553,7 +1576,9 @@ class HabitTrackerApp {
     // Fetch habits inside this group (time + category matching)
     this.editorHabitList = DEFAULT_HABITS.filter(h => h.time === timeSlot && h.category === this.editorCategory).map(h => ({
       id: h.id,
-      name: h.name
+      name: h.name,
+      time: h.time,
+      category: h.category
     }));
 
     this.renderEditorHabitsList();
@@ -1573,12 +1598,12 @@ class HabitTrackerApp {
     // Defaults
     this.dom.scheduleTimeInput.value = "07:00";
     
-    // Toggle active category pill to diet
+    // Toggle active category pill to default category
     const pillsSelector = document.querySelector('.category-pills-selector');
     if (pillsSelector) {
       pillsSelector.querySelectorAll('.category-pill-btn').forEach(btn => {
         const cat = btn.getAttribute('data-category');
-        btn.classList.toggle('active', cat === CATEGORIES[0].id);
+        btn.classList.toggle('active', cat === this.editorCategory);
       });
     }
 
@@ -1593,19 +1618,31 @@ class HabitTrackerApp {
     
     if (this.editorHabitList.length === 0) {
       this.dom.scheduleItemsList.innerHTML = `
-        <div style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 12px 0;">
+        <div style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 16px 0;">
           No habits added to this slot yet. Add below!
         </div>
       `;
       return;
     }
 
+    const currentPickerTime = this.convertTo12Hour(this.dom.scheduleTimeInput.value || "07:00");
+
     this.editorHabitList.forEach((habit, idx) => {
       const row = document.createElement('div');
       row.className = "editor-habit-row";
+      
+      const catObj = CATEGORIES.find(c => c.id === habit.category) || { name: habit.category || 'Routine', icon: '📋' };
+      const displayTime = habit.time || currentPickerTime;
+
       row.innerHTML = `
-        <span class="editor-habit-name">${habit.name}</span>
-        <button type="button" class="delete-habit-btn" title="Delete Habit">
+        <div class="editor-habit-info">
+          <span class="editor-habit-name" title="${habit.name}">${habit.name}</span>
+          <div class="editor-habit-meta">
+            <span class="editor-habit-time-badge"><i class="fa-regular fa-clock"></i> ${displayTime}</span>
+            <span class="editor-habit-cat-badge">${catObj.icon || ''} ${catObj.name}</span>
+          </div>
+        </div>
+        <button type="button" class="delete-habit-btn" title="Delete Habit" aria-label="Delete ${habit.name}">
           <i class="fa-solid fa-trash-can"></i>
         </button>
       `;
@@ -1627,9 +1664,15 @@ class HabitTrackerApp {
       return;
     }
 
+    const rawTime = this.dom.scheduleTimeInput.value || "07:00";
+    const timeSlot = this.convertTo12Hour(rawTime);
+    const category = this.editorCategory || "diet";
+
     this.editorHabitList.push({
       id: null,
-      name: val
+      name: val,
+      time: timeSlot,
+      category: category
     });
 
     this.renderEditorHabitsList();
@@ -1645,15 +1688,23 @@ class HabitTrackerApp {
       return;
     }
 
-    const newTimeSlot = this.convertTo12Hour(rawTime);
-    const category = this.editorCategory;
+    const currentPickerTime12 = this.convertTo12Hour(rawTime);
+    const currentPickerCategory = this.editorCategory || "diet";
 
     // Auto-add pending text if present
     const pendingText = this.dom.newHabitItemInput.value.trim();
     if (pendingText.length > 0) {
-      const isDuplicate = this.editorHabitList.some(item => item.name.toLowerCase() === pendingText.toLowerCase());
+      const isDuplicate = this.editorHabitList.some(item => 
+        item.name.toLowerCase() === pendingText.toLowerCase() && 
+        (item.time || currentPickerTime12) === currentPickerTime12
+      );
       if (!isDuplicate) {
-        this.editorHabitList.push({ name: pendingText });
+        this.editorHabitList.push({
+          id: null,
+          name: pendingText,
+          time: currentPickerTime12,
+          category: currentPickerCategory
+        });
       }
       this.dom.newHabitItemInput.value = "";
     }
@@ -1667,23 +1718,30 @@ class HabitTrackerApp {
     let updatedHabits;
 
     if (this.editingTimeSlot === null) {
-      console.group("%c➕ Habit Created", "color: #10b981; font-weight: bold;");
+      console.group("%c➕ Habits Created", "color: #10b981; font-weight: bold;");
       try {
         const habitsToAppend = this.editorHabitList.map(item => {
-          const id = `${newTimeSlot}|${item.name}`;
+          const itemTime = item.time || currentPickerTime12;
+          const itemCat = item.category || currentPickerCategory;
+          const id = item.id || `${itemTime}|${item.name}`;
           return {
             id,
-            time: newTimeSlot,
+            time: itemTime,
             name: item.name,
-            category
+            category: itemCat
           };
         });
-        updatedHabits = [...DEFAULT_HABITS, ...habitsToAppend];
+
+        // Avoid adding duplicate identical ID entries
+        const existingIds = new Set(DEFAULT_HABITS.map(h => h.id));
+        const uniqueHabitsToAppend = habitsToAppend.filter(h => !existingIds.has(h.id));
+
+        updatedHabits = [...DEFAULT_HABITS, ...uniqueHabitsToAppend];
         StorageManager.saveHabits(updatedHabits);
         PushService.syncAllHabits(updatedHabits);
-        console.info("New habits added to schedule:", habitsToAppend);
+        console.info("New habits added to schedule:", uniqueHabitsToAppend);
       } catch (err) {
-        console.error("Failed to save new habit:", err);
+        console.error("Failed to save new habits:", err);
       } finally {
         console.groupEnd();
       }
@@ -1693,12 +1751,14 @@ class HabitTrackerApp {
         const otherHabits = DEFAULT_HABITS.filter(h => !(h.time === this.editingTimeSlot && h.category === this.editingCategory));
         
         const updatedGroupHabits = this.editorHabitList.map(item => {
-          const id = item.id || `${newTimeSlot}|${item.name}`;
+          const itemTime = item.time || currentPickerTime12;
+          const itemCat = item.category || currentPickerCategory;
+          const id = item.id || `${itemTime}|${item.name}`;
           return {
             id,
-            time: newTimeSlot,
+            time: itemTime,
             name: item.name,
-            category
+            category: itemCat
           };
         });
 
@@ -1740,6 +1800,7 @@ class HabitTrackerApp {
         console.groupEnd();
       }
     }
+
 
     if (this.dom.loadingOverlay) {
       this.dom.loadingOverlay.classList.remove('fade-out');
